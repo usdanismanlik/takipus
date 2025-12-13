@@ -13,14 +13,21 @@ class Database
     {
         if (self::$connection === null) {
             try {
-                $host = $_ENV['DB_HOST'] ?? 'mysql';
-                $port = $_ENV['DB_PORT'] ?? '3306';
-                $dbname = $_ENV['DB_NAME'] ?? 'hse_db';
-                $username = $_ENV['DB_USER'] ?? 'hse_user';
-                $password = $_ENV['DB_PASSWORD'] ?? '';
+                // Try getenv first (for CapRover), then $_ENV (for local .env)
+                $host = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? 'mysql');
+                $port = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? '3306');
+                $dbname = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'hse_db');
+                $username = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'hse_user');
+                $password = getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? '');
 
-                // Debug log (production'da kaldırılacak)
-                error_log("DB Connection Attempt - Host: {$host}, Port: {$port}, DB: {$dbname}, User: {$username}");
+                // Debug log
+                error_log("=== DB Connection Debug ===");
+                error_log("Host: {$host}");
+                error_log("Port: {$port}");
+                error_log("Database: {$dbname}");
+                error_log("Username: {$username}");
+                error_log("Password set: " . (!empty($password) ? 'YES' : 'NO'));
+                error_log("========================");
 
                 $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 
