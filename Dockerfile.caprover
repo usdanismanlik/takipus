@@ -37,12 +37,13 @@ COPY --chown=www-data:www-data . /var/www/html/
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Create necessary directories
-RUN mkdir -p storage/logs storage/uploads \
+RUN mkdir -p storage/logs storage/uploads /tmp/sessions \
     && chown -R www-data:www-data storage \
-    && chmod -R 775 storage
+    && chmod -R 775 storage \
+    && chmod 777 /tmp/sessions
 
-# Switch to www-data user
-USER www-data
+# Don't switch to www-data yet - Apache will handle it
+# USER www-data is removed because Apache needs root to start
 
 # Expose port 80
 EXPOSE 80
