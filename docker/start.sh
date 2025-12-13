@@ -8,8 +8,11 @@ mkdir -p /var/lib/nginx/tmp/client_body \
     /var/lib/nginx/tmp/scgi
 
 # Set permissions
-chown -R www-data:www-data /var/lib/nginx
+chown -R www-data:www-data /var/lib/nginx /var/www/html
 chmod -R 755 /var/lib/nginx
 
-# Start Nginx in foreground (PHP-FPM already running from base image)
+# Start PHP-FPM in background
+php-fpm -D
+
+# Start Nginx in foreground
 exec nginx -g 'daemon off;'
