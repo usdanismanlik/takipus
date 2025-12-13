@@ -1,0 +1,56 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Development
+.env.example
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+storage/logs/*
+!storage/logs/.gitkeep
+
+# Uploads (will be handled by persistent storage)
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# Vendor (will be installed during build)
+# vendor/
+
+# Tests
+tests/
+phpunit.xml
+.phpunit.result.cache
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if any)
+node_modules/
+package.json
+package-lock.json

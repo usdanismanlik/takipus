@@ -1,0 +1,74 @@
+{
+  "name": "Genel İş Güvenliği Denetimi - 2025",
+  "description": "Tüm departmanlar için genel iş güvenliği kontrol listesi",
+  "department_id": 1,
+  "status": "active",
+  "questions": [
+    {
+      "order": 1,
+      "text": "Yangın söndürücüler erişilebilir durumda mı?",
+      "type": "yes_no",
+      "is_required": true,
+      "photo_required": true,
+      "help_text": "Yangın söndürücülerin önünde engel olmamalı ve kolayca erişilebilir olmalıdır."
+    },
+    {
+      "order": 2,
+      "text": "Acil çıkış işaretleri görünür ve aydınlatılmış mı?",
+      "type": "yes_no",
+      "is_required": true,
+      "photo_required": false,
+      "help_text": "Tüm acil çıkış işaretleri açıkça görünür olmalı ve aydınlatma çalışır durumda olmalıdır."
+    },
+    {
+      "order": 3,
+      "text": "Çalışma alanı temizlik durumu (1-5 arası puanlayın)",
+      "type": "score",
+      "is_required": true,
+      "photo_required": false,
+      "help_text": "1: Çok kötü, 5: Mükemmel",
+      "min_score": 1,
+      "max_score": 5
+    },
+    {
+      "order": 4,
+      "text": "Kişisel koruyucu ekipmanlar (KKE) kullanılıyor mu?",
+      "type": "yes_no",
+      "is_required": true,
+      "photo_required": true,
+      "help_text": "Baret, eldiven, güvenlik ayakkabısı vb. kontrol edilmelidir."
+    },
+    {
+      "order": 5,
+      "text": "Elektrik panoları kapalı ve etiketli mi?",
+      "type": "yes_no",
+      "is_required": true,
+      "photo_required": true,
+      "help_text": "Elektrik panoları kapalı olmalı ve uyarı etiketleri bulunmalıdır."
+    },
+    {
+      "order": 6,
+      "text": "İlk yardım çantası eksiksiz ve erişilebilir mi?",
+      "type": "yes_no",
+      "is_required": true,
+      "photo_required": false,
+      "help_text": "İlk yardım malzemeleri kontrol edilmeli ve son kullanma tarihleri geçmemiş olmalıdır."
+    },
+    {
+      "order": 7,
+      "text": "Makine koruyucuları yerinde ve çalışır durumda mı?",
+      "type": "yes_no",
+      "is_required": true,
+      "photo_required": true,
+      "help_text": "Tüm hareketli parçalar uygun koruyucularla kapatılmış olmalıdır."
+    },
+    {
+      "order": 8,
+      "text": "Genel güvenlik durumu hakkında ek gözlemler",
+      "type": "text",
+      "is_required": false,
+      "photo_required": false,
+      "help_text": "Varsa diğer gözlemlerinizi buraya yazınız."
+    }
+  ]
+}

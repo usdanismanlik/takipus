@@ -1,0 +1,486 @@
+[1;33m╔════════════════════════════════════════╗[0m
+[1;33m║   HSE API ENDPOINT TEST SUITE          ║[0m
+[1;33m║   Fri Nov 21 15:59:08 +03 2025                    ║[0m
+[1;33m╔════════════════════════════════════════╗[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 1. Health Check - Base URL[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1
+HTTP Code: 404
+Response:
+{
+    "success": false,
+    "error": {
+        "message": "Route not found"
+    }
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 2. Authentication - Login[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/auth/login
+Body: {"email":"test@hse.com","password":"test123"}
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "user": {
+            "id": 1,
+            "name": "Test User",
+            "email": "test@hse.com",
+            "role": "hse",
+            "department": "\u0130SG Departman\u0131"
+        },
+        "tokens": {
+            "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6InRlc3RAaHNlLmNvbSIsIm5hbWUiOiJUZXN0IFVzZXIiLCJleHAiOjE3NjM3MzM1NDh9.Z-crvmrB9pdmWl3UZxX7r8-VLTzaIsCvyFYR6TmuVPo",
+            "token_type": "Bearer",
+            "expires_in": 3600
+        }
+    },
+    "message": "Login successful"
+}
+[0;32mToken alındı: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkI...[0m
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 3. Authentication - Get Profile[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/auth/me
+Authorization: Bearer {token}
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "name": "Test User",
+        "email": "test@hse.com",
+        "role": "hse",
+        "department": "\u0130SG Departman\u0131"
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 4. Dashboard - Get Statistics[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/dashboard/stats
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "actions": {
+            "open": 0,
+            "critical": 0,
+            "overdue": 0,
+            "completed_this_month": 0
+        },
+        "field_tours": {
+            "total_this_month": 0,
+            "pending": 0
+        }
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 5. Field Tours - Get Checklists[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/field-tours/checklists
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": [
+        {
+            "id": 1,
+            "name": "Genel G\u00c3\u00bcvenlik Denetimi",
+            "description": "T\u00c3\u00bcm alanlar i\u00c3\u00a7in genel g\u00c3\u00bcvenlik kontrol\u00c3\u00bc",
+            "department_id": null,
+            "status": "active",
+            "created_by": 1,
+            "created_at": "2025-11-21 12:52:54",
+            "updated_at": "2025-11-21 12:52:54",
+            "question_count": 3
+        },
+        {
+            "id": 2,
+            "name": "Yang\u00c4\u00b1n G\u00c3\u00bcvenli\u00c4\u0178i Kontrol\u00c3\u00bc",
+            "description": "Yang\u00c4\u00b1n s\u00c3\u00b6nd\u00c3\u00bcr\u00c3\u00bcc\u00c3\u00bc ve acil \u00c3\u00a7\u00c4\u00b1k\u00c4\u00b1\u00c5\u0178 kontrolleri",
+            "department_id": null,
+            "status": "active",
+            "created_by": 1,
+            "created_at": "2025-11-21 12:52:54",
+            "updated_at": "2025-11-21 12:52:54",
+            "question_count": 0
+        }
+    ],
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 6. Field Tours - Get Checklist Detail (ID: 1)[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/field-tours/checklists/1
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "name": "Genel G\u00c3\u00bcvenlik Denetimi",
+        "description": "T\u00c3\u00bcm alanlar i\u00c3\u00a7in genel g\u00c3\u00bcvenlik kontrol\u00c3\u00bc",
+        "department_id": null,
+        "status": "active",
+        "created_by": 1,
+        "created_at": "2025-11-21 12:52:54",
+        "updated_at": "2025-11-21 12:52:54",
+        "questions": [
+            {
+                "id": 1,
+                "checklist_id": 1,
+                "order_num": 1,
+                "text": "Yang\u00c4\u00b1n s\u00c3\u00b6nd\u00c3\u00bcr\u00c3\u00bcc\u00c3\u00bcler eri\u00c5\u0178ilebilir mi?",
+                "type": "yes_no",
+                "is_required": 1,
+                "photo_required": 1,
+                "help_text": null,
+                "min_score": null,
+                "max_score": null,
+                "created_at": "2025-11-21 12:52:54",
+                "updated_at": "2025-11-21 12:52:54"
+            },
+            {
+                "id": 2,
+                "checklist_id": 1,
+                "order_num": 2,
+                "text": "Acil \u00c3\u00a7\u00c4\u00b1k\u00c4\u00b1\u00c5\u0178 i\u00c5\u0178aretleri g\u00c3\u00b6r\u00c3\u00bcn\u00c3\u00bcr m\u00c3\u00bc?",
+                "type": "yes_no",
+                "is_required": 1,
+                "photo_required": 0,
+                "help_text": null,
+                "min_score": null,
+                "max_score": null,
+                "created_at": "2025-11-21 12:52:54",
+                "updated_at": "2025-11-21 12:52:54"
+            },
+            {
+                "id": 3,
+                "checklist_id": 1,
+                "order_num": 3,
+                "text": "Genel temizlik durumu (1-5)",
+                "type": "score",
+                "is_required": 1,
+                "photo_required": 0,
+                "help_text": null,
+                "min_score": null,
+                "max_score": null,
+                "created_at": "2025-11-21 12:52:54",
+                "updated_at": "2025-11-21 12:52:54"
+            }
+        ],
+        "question_count": 3
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 7. Field Tours - Create New Field Tour[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/field-tours
+Body: {"checklist_id":1,"location":"Test Lokasyonu - 15:59:08"}
+HTTP Code: 201
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 2,
+        "checklist_id": 1,
+        "inspector_id": 1,
+        "location": "Test Lokasyonu - 15:59:08",
+        "status": "in_progress",
+        "started_at": "2025-11-21 12:59:09",
+        "completed_at": null,
+        "summary": null,
+        "overall_score": null,
+        "created_at": "2025-11-21 12:59:09",
+        "updated_at": "2025-11-21 12:59:09"
+    },
+    "message": "Field tour started"
+}
+[0;32mField Tour oluşturuldu, ID: 2[0m
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 8. Field Tours - Store Responses[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/field-tours/2/responses
+Body: Responses array
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "field_tour_id": 2,
+        "responses_saved": 3
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 9. Field Tours - Complete Field Tour[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/field-tours/2/complete
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 2,
+        "checklist_id": 1,
+        "inspector_id": 1,
+        "location": "Test Lokasyonu - 15:59:08",
+        "status": "completed",
+        "started_at": "2025-11-21 12:59:09",
+        "completed_at": "2025-11-21 12:59:09",
+        "summary": "Test turu tamamland\u0131",
+        "overall_score": "85.50",
+        "created_at": "2025-11-21 12:59:09",
+        "updated_at": "2025-11-21 12:59:09"
+    },
+    "message": "Field tour completed"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 10. Actions - Get Actions List[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/actions
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "items": [],
+        "pagination": {
+            "current_page": 1,
+            "per_page": 20,
+            "total": 0,
+            "last_page": 0
+        }
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 11. Actions - Create New Action[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/actions
+HTTP Code: 201
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "code": "HSE-2025-0001",
+        "title": "Test Aksiyonu",
+        "description": "Test a\u00e7\u0131klamas\u0131",
+        "location": null,
+        "department_id": null,
+        "assigned_to_user_id": null,
+        "assigned_by_user_id": 1,
+        "source": "manual",
+        "risk_level": null,
+        "risk_score": null,
+        "priority": "high",
+        "status": "open",
+        "due_date": "2025-12-31",
+        "created_at": "2025-11-21 12:59:09",
+        "updated_at": "2025-11-21 12:59:09"
+    },
+    "message": "Action created"
+}
+[0;32mAction oluşturuldu, ID: 1[0m
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 12. Actions - Get Action Detail[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/actions/1
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "code": "HSE-2025-0001",
+        "title": "Test Aksiyonu",
+        "description": "Test a\u00e7\u0131klamas\u0131",
+        "location": null,
+        "department_id": null,
+        "assigned_to_user_id": null,
+        "assigned_by_user_id": 1,
+        "source": "manual",
+        "risk_level": null,
+        "risk_score": null,
+        "priority": "high",
+        "status": "open",
+        "due_date": "2025-12-31",
+        "created_at": "2025-11-21 12:59:09",
+        "updated_at": "2025-11-21 12:59:09",
+        "comments": []
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 13. Actions - Add Comment[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/actions/1/comments
+HTTP Code: 201
+Response:
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "action_id": 1,
+        "comment": "Test yorumu - \u0130\u015flem devam ediyor"
+    },
+    "message": "Comment added"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 14. Notifications - Get Notifications[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/notifications
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": {
+        "items": [],
+        "unread_count": 0,
+        "pagination": {
+            "current_page": 1,
+            "per_page": 20,
+            "total": 0,
+            "last_page": 0
+        }
+    },
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 15. Helpers - Get Departments[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/departments
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": [
+        {
+            "id": 1,
+            "name": "\u00c4\u00b0SG Departman\u00c4\u00b1",
+            "code": "ISG",
+            "manager_id": null,
+            "created_at": "2025-11-21 12:52:54",
+            "updated_at": "2025-11-21 12:52:54"
+        },
+        {
+            "id": 2,
+            "name": "\u00c3\u0153retim",
+            "code": "PROD",
+            "manager_id": null,
+            "created_at": "2025-11-21 12:52:54",
+            "updated_at": "2025-11-21 12:52:54"
+        },
+        {
+            "id": 3,
+            "name": "Kalite",
+            "code": "QA",
+            "manager_id": null,
+            "created_at": "2025-11-21 12:52:54",
+            "updated_at": "2025-11-21 12:52:54"
+        }
+    ],
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 16. Helpers - Get Users[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/users
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": [
+        {
+            "id": 1,
+            "name": "Test User",
+            "email": "test@hse.com",
+            "department": "\u0130SG Departman\u0131",
+            "role": "hse"
+        },
+        {
+            "id": 2,
+            "name": "John Doe",
+            "email": "john@hse.com",
+            "department": "\u00dcretim",
+            "role": "action_owner"
+        }
+    ],
+    "message": "Success"
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 17. Security - Unauthorized Access Test[0m
+[0;34m========================================[0m
+Request: GET http://localhost:8081/api/v1/dashboard/stats (without token)
+HTTP Code: 401
+Response:
+{
+    "success": false,
+    "error": {
+        "message": "Unauthorized"
+    }
+}
+[0;32m✅ BAŞARILI[0m
+
+[0;34m========================================[0m
+[0;34mTEST: 18. Authentication - Logout[0m
+[0;34m========================================[0m
+Request: POST http://localhost:8081/api/v1/auth/logout
+HTTP Code: 200
+Response:
+{
+    "success": true,
+    "data": null,
+    "message": "Logged out successfully"
+}
+[0;32m✅ BAŞARILI[0m
+
+[1;33m╔════════════════════════════════════════╗[0m
+[1;33m║          TEST ÖZET                      ║[0m
+[1;33m╚════════════════════════════════════════╝[0m
+Log dosyası: test_results_20251121_155908.log
+Test tamamlandı: Fri Nov 21 15:59:09 +03 2025
+
+[0;32mTüm testler tamamlandı![0m
+[0;34mDetaylı sonuçlar için log dosyasını inceleyin.[0m

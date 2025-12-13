@@ -1,0 +1,15 @@
+{
+  "name": "hse/api",
+  "description": "HSE Action Management System API",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "vlucas/phpdotenv": "^5.5",
+    "firebase/php-jwt": "^6.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "Src\\": "src/"
+    }
+  }
+}
