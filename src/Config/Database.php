@@ -20,17 +20,22 @@ class Database
                 $username = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'hse_user');
                 $password = getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? '');
 
-                // Debug log - STDOUT'a da yaz
-                $debug = "=== DB Connection Debug ===\n";
-                $debug .= "Host: {$host}\n";
-                $debug .= "Port: {$port}\n";
-                $debug .= "Database: {$dbname}\n";
-                $debug .= "Username: {$username}\n";
-                $debug .= "Password set: " . (!empty($password) ? 'YES (' . strlen($password) . ' chars)' : 'NO') . "\n";
-                $debug .= "========================\n";
+                // Debug log - FORCE to stderr
+                $debug = "\n=== DB Connection Debug ===\n";
+                $debug .= "getenv('DB_HOST'): " . (getenv('DB_HOST') ?: 'NOT SET') . "\n";
+                $debug .= "getenv('DB_USER'): " . (getenv('DB_USER') ?: 'NOT SET') . "\n";
+                $debug .= "getenv('DB_PASSWORD'): " . (getenv('DB_PASSWORD') ? 'SET (' . strlen(getenv('DB_PASSWORD')) . ' chars)' : 'NOT SET') . "\n";
+                $debug .= "\$_ENV['DB_HOST']: " . ($_ENV['DB_HOST'] ?? 'NOT SET') . "\n";
+                $debug .= "\$_ENV['DB_USER']: " . ($_ENV['DB_USER'] ?? 'NOT SET') . "\n";
+                $debug .= "Final Host: {$host}\n";
+                $debug .= "Final Port: {$port}\n";
+                $debug .= "Final Database: {$dbname}\n";
+                $debug .= "Final Username: {$username}\n";
+                $debug .= "Final Password: " . (!empty($password) ? 'YES (' . strlen($password) . ' chars) - First 3: ' . substr($password, 0, 3) : 'NO') . "\n";
+                $debug .= "========================\n\n";
                 
-                error_log($debug);
                 file_put_contents('php://stderr', $debug);
+                error_log($debug);
 
                 $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 
