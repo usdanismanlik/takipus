@@ -19,10 +19,10 @@ abstract class Model
     private function connect(): void
     {
         $host = $_ENV['DB_HOST'] ?? 'localhost';
-        $port = $_ENV['DB_PORT'] ?? '3306';
-        $dbname = $_ENV['DB_NAME'] ?? 'hse_db';
-        $username = $_ENV['DB_USER'] ?? 'root';
-        $password = $_ENV['DB_PASS'] ?? '';
+        $port = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? '3306');
+        $dbname = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'hse_db');
+        $username = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'root');
+        $password = getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? '');
 
         try {
             $this->db = new PDO(
