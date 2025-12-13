@@ -7,38 +7,50 @@ class FieldTour extends Model
     protected string $table = 'field_tours';
 
     protected array $fillable = [
+        'company_id',
         'checklist_id',
-        'inspector_id',
-        'location',
+        'inspector_user_id',
         'status',
         'started_at',
         'completed_at',
-        'summary',
-        'overall_score',
+        'location',
+        'notes',
     ];
 
-    public function withResponses(int $id): ?array
+    public function getWithResponses(int $id): ?array
     {
-        $fieldTour = $this->find($id);
-
-        if (!$fieldTour) {
+        $tour = $this->find($id);
+        if (!$tour) {
             return null;
         }
 
-        $sql = "SELECT * FROM field_tour_responses WHERE field_tour_id = ?";
+        $sql = "SELECT r.*, q.question_text, q.question_type 
+                FROM field_tour_responses r
+                JOIN checklist_questions q ON r.question_id = q.id
+                WHERE r.field_tour_id = ?
+                ORDER BY q.order_num ASC";
+        
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$id]);
+        $tour['responses'] = $stmt->fetchAll();
 
-        $fieldTour['responses'] = $stmt->fetchAll();
-
-        return $fieldTour;
+        return $tour;
     }
 
-    public function complete(int $id, array $data): bool
+    public function getByCompany(string $companyId, ?string $status = null): array
     {
-        $data['status'] = 'completed';
-        $data['completed_at'] = date('Y-m-d H:i:s');
+        $sql = "SELECT * FROM {$this->table} WHERE company_id = ?";
+        $params = [$companyId];
 
-        return $this->update($id, $data);
+        if ($status) {
+            $sql .= " AND status = ?";
+            $params[] = $status;
+        }
+
+        $sql .= " ORDER BY started_at DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 }

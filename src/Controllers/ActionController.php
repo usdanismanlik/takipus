@@ -3,201 +3,584 @@
 namespace Src\Controllers;
 
 use Src\Models\Action;
-use Src\Models\ActionTimeline;
-use Src\Middleware\AuthMiddleware;
+use Src\Models\ActionClosure;
+use Src\Models\Notification;
 use Src\Helpers\Response;
+use Src\Helpers\AuditLogger;
+use Src\Helpers\RiskMatrix;
 
 class ActionController
 {
     private Action $actionModel;
+    private ActionClosure $closureModel;
+    private Notification $notificationModel;
 
     public function __construct()
     {
         $this->actionModel = new Action();
+        $this->closureModel = new ActionClosure();
+        $this->notificationModel = new Notification();
     }
 
-    public function index(): void
+    /**
+     * POST /api/v1/actions/manual
+     * Manuel aksiyon oluştur
+     */
+    public function createManual(): void
     {
-        $page = (int) ($_GET['page'] ?? 1);
-        $perPage = (int) ($_GET['per_page'] ?? 20);
-        $offset = ($page - 1) * $perPage;
+        $data = json_decode(file_get_contents('php://input'), true);
 
-        $conditions = [];
-        if (isset($_GET['status'])) {
-            $conditions['status'] = $_GET['status'];
+        // Validasyon
+        if (!isset($data['company_id']) || !isset($data['title']) || !isset($data['description'])) {
+            Response::error('company_id, title ve description alanları zorunludur', 422);
+            return;
         }
 
-        $actions = $this->actionModel->all($conditions, $perPage, $offset);
-        $total = $this->actionModel->count($conditions);
+        if (!isset($data['created_by'])) {
+            Response::error('created_by alanı zorunludur', 422);
+            return;
+        }
 
-        Response::paginated($actions, $total, $page, $perPage);
+        // Risk matrisi hesaplama
+        $riskProbability = $data['risk_probability'] ?? 3;
+        $riskSeverity = $data['risk_severity'] ?? 3;
+        $riskInfo = RiskMatrix::calculateRisk($riskProbability, $riskSeverity);
+
+        // Termin uyarı günleri
+        $reminderDays = null;
+        if (isset($data['due_date_reminder_days']) && is_array($data['due_date_reminder_days'])) {
+            $reminderDays = json_encode($data['due_date_reminder_days']);
+        } elseif (isset($data['due_date'])) {
+            $reminderDays = json_encode([7, 3, 1]);
+        }
+
+        // Manuel aksiyon oluştur
+        $actionId = $this->actionModel->create([
+            'company_id' => $data['company_id'],
+            'field_tour_id' => 0, // Manuel aksiyonlar için 0
+            'response_id' => 0,
+            'title' => $data['title'],
+            'description' => $data['description'],
+            'location' => $data['location'] ?? null,
+            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+            'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
+            'status' => 'open',
+            'priority' => $riskInfo['priority'],
+            'risk_score' => $riskInfo['score'],
+            'risk_probability' => $riskProbability,
+            'risk_severity' => $riskSeverity,
+            'risk_level' => $riskInfo['level'],
+            'source_type' => $data['source_type'] ?? 'other',
+            'due_date' => $data['due_date'] ?? null,
+            'due_date_reminder_days' => $reminderDays,
+            'created_by' => $data['created_by'],
+        ]);
+
+        // Atanan kişiye bildirim
+        if (isset($data['assigned_to_user_id'])) {
+            $this->notificationModel->create([
+                'user_id' => $data['assigned_to_user_id'],
+                'type' => 'action_assigned',
+                'title' => 'Yeni Aksiyon Atandı',
+                'message' => "Size yeni bir aksiyon atandı: {$data['title']}",
+                'related_type' => 'action',
+                'related_id' => $actionId,
+            ]);
+        }
+
+        // Audit log
+        $action = $this->actionModel->find($actionId);
+        AuditLogger::logCreate(
+            '/api/v1/actions/manual',
+            'action',
+            $actionId,
+            $action,
+            $data['created_by']
+        );
+
+        if ($action['due_date_reminder_days']) {
+            $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
+        }
+
+        Response::success($action, 'Manuel aksiyon başarıyla oluşturuldu', 201);
     }
 
+    /**
+     * GET /api/v1/actions
+     * Aksiyonları listele
+     */
+    public function index(): void
+    {
+        $companyId = $_GET['company_id'] ?? null;
+        $userId = $_GET['user_id'] ?? null;
+        $status = $_GET['status'] ?? null;
+        $isOverdue = $_GET['is_overdue'] ?? null;
+
+        if ($userId) {
+            $actions = $this->actionModel->getByAssignedUser((int)$userId, $status);
+        } elseif ($companyId) {
+            $actions = $this->actionModel->getByCompany($companyId, $status);
+        } else {
+            Response::error('company_id veya user_id parametresi zorunludur', 422);
+            return;
+        }
+
+        // Overdue filtresi
+        if ($isOverdue !== null) {
+            $actions = array_filter($actions, function($action) use ($isOverdue) {
+                return $action['is_overdue'] == (int)$isOverdue;
+            });
+            $actions = array_values($actions);
+        }
+
+        // JSON alanlarını decode et
+        foreach ($actions as &$action) {
+            if ($action['due_date_reminder_days']) {
+                $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
+            }
+        }
+
+        Response::success($actions);
+    }
+
+    /**
+     * GET /api/v1/actions/:id
+     * Aksiyon detayı
+     */
     public function show(int $id): void
     {
-        $action = $this->actionModel->withComments($id);
+        $action = $this->actionModel->find($id);
 
         if (!$action) {
-            Response::error('Action not found', 404);
+            Response::error('Aksiyon bulunamadı', 404);
             return;
+        }
+
+        // JSON alanlarını decode et
+        if ($action['due_date_reminder_days']) {
+            $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
         }
 
         Response::success($action);
     }
 
-    public function store(): void
+    /**
+     * PUT /api/v1/actions/:id
+     * Aksiyon güncelle
+     */
+    public function update(int $id): void
     {
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (!isset($data['title']) || !isset($data['description'])) {
-            Response::error('Title and description are required', 422);
-            return;
-        }
-
-        $userId = AuthMiddleware::getUserId();
-
-        $data['code'] = $this->actionModel->generateCode();
-        $data['assigned_by_user_id'] = $userId;
-        $data['source'] = $data['source'] ?? 'manual';
-        $data['status'] = 'open';
-
-        $id = $this->actionModel->create($data);
-        $action = $this->actionModel->find($id);
-
-        Response::success($action, 'Action created', 201);
-    }
-
-    /**
-     * Add comment to action
-     */
-    public function addComment(int $id): void
-    {
-        $data = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($data['comment'])) {
-            Response::error('Comment is required', 422);
-            return;
-        }
-
         $action = $this->actionModel->find($id);
         if (!$action) {
-            Response::error('Action not found', 404);
+            Response::error('Aksiyon bulunamadı', 404);
             return;
         }
 
-        $sql = "INSERT INTO action_comments (action_id, comment, user_id) VALUES (?, ?, ?)";
-        $stmt = $this->actionModel->db->prepare($sql);
-        $stmt->execute([$id, $data['comment'], 1]); // TODO: Get user_id from auth
-
-        $commentId = $this->actionModel->db->lastInsertId();
-
-        // Add timeline event
-        $timelineModel = new ActionTimeline();
-        $timelineModel->addEvent($id, 'comment_added', null, null, 'Yorum eklendi: ' . $data['comment']);
-
-        Response::success([
-            'id' => $commentId,
-            'action_id' => $id,
-            'comment' => $data['comment']
-        ], 'Comment added', 201);
-    }
-
-    /**
-     * Get action timeline
-     */
-    public function timeline(int $id): void
-    {
-        $action = $this->actionModel->find($id);
-        if (!$action) {
-            Response::error('Action not found', 404);
-            return;
-        }
-
-        $timelineModel = new ActionTimeline();
-        $timeline = $timelineModel->getByAction($id);
-
-        Response::success($timeline);
-    }
-
-    /**
-     * Update action status
-     */
-    public function updateStatus(int $id): void
-    {
-        $data = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($data['status'])) {
-            Response::error('Status is required', 422);
-            return;
-        }
-
-        $action = $this->actionModel->find($id);
-        if (!$action) {
-            Response::error('Action not found', 404);
-            return;
-        }
-
+        $updateData = [];
         $oldStatus = $action['status'];
-        $newStatus = $data['status'];
 
-        $this->actionModel->update($id, ['status' => $newStatus]);
+        if (isset($data['title'])) $updateData['title'] = $data['title'];
+        if (isset($data['description'])) $updateData['description'] = $data['description'];
+        if (isset($data['location'])) $updateData['location'] = $data['location'];
+        if (isset($data['assigned_to_user_id'])) $updateData['assigned_to_user_id'] = $data['assigned_to_user_id'];
+        if (isset($data['assigned_to_department_id'])) $updateData['assigned_to_department_id'] = $data['assigned_to_department_id'];
+        if (isset($data['priority'])) $updateData['priority'] = $data['priority'];
+        if (isset($data['risk_score'])) $updateData['risk_score'] = $data['risk_score'];
+        if (isset($data['status'])) $updateData['status'] = $data['status'];
+        
+        // Due date ve reminder days güncelleme
+        if (isset($data['due_date'])) {
+            $updateData['due_date'] = $data['due_date'];
+        }
+        
+        if (isset($data['due_date_reminder_days']) && is_array($data['due_date_reminder_days'])) {
+            $updateData['due_date_reminder_days'] = json_encode($data['due_date_reminder_days']);
+        }
 
-        // Add timeline event
-        $timelineModel = new ActionTimeline();
-        $statusLabels = [
-            'open' => 'Açık',
-            'in_progress' => 'Devam Ediyor',
-            'pending_approval' => 'Onay Bekliyor',
-            'closed' => 'Kapalı'
-        ];
+        if (!empty($updateData)) {
+            // Audit log için eski değerleri kaydet
+            $oldValues = $action;
+            
+            $this->actionModel->update($id, $updateData);
+            
+            // Audit log
+            $newValues = $this->actionModel->find($id);
+            AuditLogger::logUpdate(
+                '/api/v1/actions/' . $id,
+                'action',
+                $id,
+                $oldValues,
+                $newValues,
+                $action['assigned_to_user_id']
+            );
+        }
 
-        $timelineModel->addEvent(
-            $id,
-            'status_changed',
-            $statusLabels[$oldStatus] ?? $oldStatus,
-            $statusLabels[$newStatus] ?? $newStatus,
-            'Durum değiştirildi'
-        );
+        // Status değişti mi kontrol et
+        if (isset($data['status']) && $data['status'] !== $oldStatus) {
+            $this->sendStatusChangeNotification($action, $data['status']);
+        }
 
-        Response::success([
-            'id' => $id,
-            'status' => $newStatus
-        ], 'Status updated');
+        // Atanan kişi değişti mi kontrol et
+        if (isset($data['assigned_to_user_id']) && $data['assigned_to_user_id'] != $action['assigned_to_user_id']) {
+            $this->sendAssignmentNotification($action, $data['assigned_to_user_id']);
+        }
+
+        $updated = $this->actionModel->find($id);
+        
+        // JSON alanlarını decode et
+        if ($updated['due_date_reminder_days']) {
+            $updated['due_date_reminder_days'] = json_decode($updated['due_date_reminder_days'], true);
+        }
+
+        Response::success($updated, 'Aksiyon başarıyla güncellendi');
     }
 
     /**
-     * Assign action to user
+     * PUT /api/v1/actions/:id/complete
+     * Aksiyonu tamamla
      */
-    public function assign(int $id): void
+    public function complete(int $id): void
+    {
+        $action = $this->actionModel->find($id);
+
+        if (!$action) {
+            Response::error('Aksiyon bulunamadı', 404);
+            return;
+        }
+
+        if ($action['status'] === 'completed') {
+            Response::error('Aksiyon zaten tamamlanmış', 422);
+            return;
+        }
+
+        $oldValues = $action;
+        
+        $this->actionModel->update($id, [
+            'status' => 'completed',
+            'completed_at' => date('Y-m-d H:i:s'),
+        ]);
+        
+        // Audit log
+        $newValues = $this->actionModel->find($id);
+        AuditLogger::logUpdate(
+            '/api/v1/actions/' . $id . '/complete',
+            'action',
+            $id,
+            $oldValues,
+            $newValues,
+            $action['assigned_to_user_id']
+        );
+
+        // Tamamlama bildirimi gönder
+        $this->sendCompletionNotification($action);
+
+        $updated = $this->actionModel->find($id);
+        Response::success($updated, 'Aksiyon tamamlandı');
+    }
+
+    /**
+     * POST /api/v1/actions/:id/closure-request
+     * Kapatma talebi gönder
+     */
+    public function requestClosure(int $id): void
     {
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (!isset($data['user_id'])) {
-            Response::error('User ID is required', 422);
-            return;
-        }
-
         $action = $this->actionModel->find($id);
         if (!$action) {
-            Response::error('Action not found', 404);
+            Response::error('Aksiyon bulunamadı', 404);
             return;
         }
 
-        $this->actionModel->update($id, ['assigned_to_user_id' => $data['user_id']]);
+        // Validasyon
+        if (!isset($data['closure_description'])) {
+            Response::error('closure_description alanı zorunludur', 422);
+            return;
+        }
 
-        // Add timeline event
-        $timelineModel = new ActionTimeline();
-        $timelineModel->addEvent(
-            $id,
-            'assigned',
-            null,
-            'User #' . $data['user_id'],
-            'Aksiyon atandı'
+        if (!isset($data['requested_by'])) {
+            Response::error('requested_by alanı zorunludur', 422);
+            return;
+        }
+
+        // Aksiyon zaten tamamlanmış mı?
+        if ($action['status'] === 'completed') {
+            Response::error('Aksiyon zaten tamamlanmış', 422);
+            return;
+        }
+
+        // Bekleyen kapatma talebi var mı?
+        $existingClosure = $this->closureModel->getLatestByAction($id);
+        if ($existingClosure && $existingClosure['status'] === 'pending') {
+            Response::error('Bu aksiyon için bekleyen bir kapatma talebi zaten var', 422);
+            return;
+        }
+
+        // Kanıt dosyalarını JSON olarak kaydet
+        $evidenceFiles = null;
+        if (isset($data['evidence_files']) && is_array($data['evidence_files'])) {
+            $evidenceFiles = json_encode($data['evidence_files']);
+        }
+
+        // Kapatma talebi oluştur
+        $closureId = $this->closureModel->create([
+            'action_id' => $id,
+            'requested_by' => $data['requested_by'],
+            'closure_description' => $data['closure_description'],
+            'evidence_files' => $evidenceFiles,
+            'requires_upper_approval' => $data['requires_upper_approval'] ?? 0,
+            'status' => 'pending',
+        ]);
+
+        // Aksiyonun durumunu 'pending_approval' yap
+        $this->actionModel->update($id, ['status' => 'pending_approval']);
+
+        // Bildirimleri gönder
+        $this->sendClosureRequestNotifications($action, $closureId);
+
+        // Audit log
+        $closure = $this->closureModel->find($closureId);
+        AuditLogger::logCreate(
+            '/api/v1/actions/' . $id . '/closure-request',
+            'action_closure',
+            $closureId,
+            $closure,
+            $data['requested_by']
         );
 
-        Response::success([
-            'id' => $id,
-            'assigned_to_user_id' => $data['user_id']
-        ], 'Action assigned');
+        if ($closure['evidence_files']) {
+            $closure['evidence_files'] = json_decode($closure['evidence_files'], true);
+        }
+
+        Response::success($closure, 'Kapatma talebi gönderildi', 201);
+    }
+
+    /**
+     * PUT /api/v1/actions/:id/closure/:closureId/approve
+     * Kapatma talebini onayla
+     */
+    public function approveClosure(int $id, int $closureId): void
+    {
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        $closure = $this->closureModel->find($closureId);
+        if (!$closure || $closure['action_id'] != $id) {
+            Response::error('Kapatma talebi bulunamadı', 404);
+            return;
+        }
+
+        if ($closure['status'] !== 'pending') {
+            Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
+            return;
+        }
+
+        if (!isset($data['reviewed_by'])) {
+            Response::error('reviewed_by alanı zorunludur', 422);
+            return;
+        }
+
+        $isUpperApproval = $data['is_upper_approval'] ?? false;
+
+        if ($isUpperApproval) {
+            // Üst amir onayı
+            $this->closureModel->update($closureId, [
+                'upper_approved_by' => $data['reviewed_by'],
+                'upper_review_notes' => $data['review_notes'] ?? null,
+                'upper_reviewed_at' => date('Y-m-d H:i:s'),
+                'status' => 'approved',
+            ]);
+        } else {
+            // Normal onay
+            $updateData = [
+                'reviewed_by' => $data['reviewed_by'],
+                'review_notes' => $data['review_notes'] ?? null,
+                'reviewed_at' => date('Y-m-d H:i:s'),
+            ];
+
+            // Üst amir onayı gerekli mi?
+            if ($closure['requires_upper_approval']) {
+                // Henüz tamamlanmadı, üst amir onayı bekliyor
+                $updateData['status'] = 'pending';
+            } else {
+                // Onaylanmış, aksiyon tamamlanabilir
+                $updateData['status'] = 'approved';
+            }
+
+            $this->closureModel->update($closureId, $updateData);
+        }
+
+        $updatedClosure = $this->closureModel->find($closureId);
+
+        // Eğer tam onay aldıysa aksiyonu tamamla
+        if ($updatedClosure['status'] === 'approved') {
+            $this->actionModel->update($id, [
+                'status' => 'completed',
+                'completed_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            // Tamamlama bildirimi
+            $action = $this->actionModel->find($id);
+            $this->sendClosureApprovedNotifications($action, $updatedClosure);
+        } elseif ($closure['requires_upper_approval'] && !$isUpperApproval) {
+            // Üst amir onayı için bildirim gönder
+            $this->sendUpperApprovalRequestNotification($id, $closureId);
+        }
+
+        // Audit log
+        AuditLogger::logUpdate(
+            '/api/v1/actions/' . $id . '/closure/' . $closureId . '/approve',
+            'action_closure',
+            $closureId,
+            $closure,
+            $updatedClosure,
+            $data['reviewed_by']
+        );
+
+        if ($updatedClosure['evidence_files']) {
+            $updatedClosure['evidence_files'] = json_decode($updatedClosure['evidence_files'], true);
+        }
+
+        Response::success($updatedClosure, 'Kapatma talebi onaylandı');
+    }
+
+    /**
+     * PUT /api/v1/actions/:id/closure/:closureId/reject
+     * Kapatma talebini reddet
+     */
+    public function rejectClosure(int $id, int $closureId): void
+    {
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        $closure = $this->closureModel->find($closureId);
+        if (!$closure || $closure['action_id'] != $id) {
+            Response::error('Kapatma talebi bulunamadı', 404);
+            return;
+        }
+
+        if ($closure['status'] !== 'pending') {
+            Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
+            return;
+        }
+
+        if (!isset($data['reviewed_by']) || !isset($data['review_notes'])) {
+            Response::error('reviewed_by ve review_notes alanları zorunludur', 422);
+            return;
+        }
+
+        // Reddet
+        $this->closureModel->update($closureId, [
+            'reviewed_by' => $data['reviewed_by'],
+            'review_notes' => $data['review_notes'],
+            'reviewed_at' => date('Y-m-d H:i:s'),
+            'status' => 'rejected',
+        ]);
+
+        // Aksiyonun durumunu geri al
+        $this->actionModel->update($id, ['status' => 'in_progress']);
+
+        // Reddedilme bildirimi
+        $action = $this->actionModel->find($id);
+        $this->sendClosureRejectedNotifications($action, $closure, $data['review_notes']);
+
+        // Audit log
+        $updatedClosure = $this->closureModel->find($closureId);
+        AuditLogger::logUpdate(
+            '/api/v1/actions/' . $id . '/closure/' . $closureId . '/reject',
+            'action_closure',
+            $closureId,
+            $closure,
+            $updatedClosure,
+            $data['reviewed_by']
+        );
+
+        if ($updatedClosure['evidence_files']) {
+            $updatedClosure['evidence_files'] = json_decode($updatedClosure['evidence_files'], true);
+        }
+
+        Response::success($updatedClosure, 'Kapatma talebi reddedildi');
+    }
+
+    /**
+     * GET /api/v1/actions/:id/closures
+     * Aksiyonun kapatma taleplerini listele
+     */
+    public function getClosures(int $id): void
+    {
+        $action = $this->actionModel->find($id);
+        if (!$action) {
+            Response::error('Aksiyon bulunamadı', 404);
+            return;
+        }
+
+        $closures = $this->closureModel->getByAction($id);
+
+        // JSON alanlarını decode et
+        foreach ($closures as &$closure) {
+            if ($closure['evidence_files']) {
+                $closure['evidence_files'] = json_decode($closure['evidence_files'], true);
+            }
+        }
+
+        Response::success($closures);
+    }
+
+    /**
+     * Status değişikliği bildirimi
+     */
+    private function sendStatusChangeNotification(array $action, string $newStatus): void
+    {
+        if ($action['assigned_to_user_id']) {
+            $statusLabels = [
+                'open' => 'Açık',
+                'in_progress' => 'Devam Ediyor',
+                'pending_approval' => 'Onay Bekliyor',
+                'completed' => 'Tamamlandı',
+                'cancelled' => 'İptal Edildi',
+            ];
+
+            $this->notificationModel->create([
+                'user_id' => $action['assigned_to_user_id'],
+                'type' => 'action_status_changed',
+                'title' => 'Aksiyon Durumu Değişti',
+                'message' => "'{$action['title']}' aksiyonunun durumu '{$statusLabels[$newStatus]}' olarak güncellendi.",
+                'related_type' => 'action',
+                'related_id' => $action['id'],
+            ]);
+        }
+    }
+
+    /**
+     * Atama bildirimi
+     */
+    private function sendAssignmentNotification(array $action, int $newUserId): void
+    {
+        $this->notificationModel->create([
+            'user_id' => $newUserId,
+            'type' => 'action_assigned',
+            'title' => 'Yeni Aksiyon Atandı',
+            'message' => "Size yeni bir aksiyon atandı: {$action['title']}",
+            'related_type' => 'action',
+            'related_id' => $action['id'],
+        ]);
+    }
+
+    /**
+     * Tamamlama bildirimi
+     */
+    private function sendCompletionNotification(array $action): void
+    {
+        // Aksiyonu oluşturana bildirim gönder
+        if ($action['created_by']) {
+            $this->notificationModel->create([
+                'user_id' => $action['created_by'],
+                'type' => 'action_completed',
+                'title' => 'Aksiyon Tamamlandı',
+                'message' => "'{$action['title']}' aksiyonu tamamlandı.",
+                'related_type' => 'action',
+                'related_id' => $action['id'],
+            ]);
+        }
     }
 }

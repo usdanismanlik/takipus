@@ -2,31 +2,55 @@
 
 namespace Src\Models;
 
-use Src\Config\Database;
 use PDO;
+use PDOException;
 
 abstract class Model
 {
-    public PDO $db;
+    protected PDO $db;
     protected string $table;
-    protected string $primaryKey = 'id';
     protected array $fillable = [];
 
     public function __construct()
     {
-        $this->db = Database::getConnection();
+        $this->connect();
+    }
+
+    private function connect(): void
+    {
+        $host = $_ENV['DB_HOST'] ?? 'localhost';
+        $port = $_ENV['DB_PORT'] ?? '3306';
+        $dbname = $_ENV['DB_NAME'] ?? 'hse_db';
+        $username = $_ENV['DB_USER'] ?? 'root';
+        $password = $_ENV['DB_PASS'] ?? '';
+
+        try {
+            $this->db = new PDO(
+                "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4",
+                $username,
+                $password,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]
+            );
+        } catch (PDOException $e) {
+            error_log("Database connection failed: " . $e->getMessage());
+            throw new \Exception("Database connection failed");
+        }
     }
 
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE {$this->primaryKey} = ?");
+        $sql = "SELECT * FROM {$this->table} WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
         $stmt->execute([$id]);
         $result = $stmt->fetch();
-
         return $result ?: null;
     }
 
-    public function all(array $conditions = [], int $limit = 100, int $offset = 0): array
+    public function all(array $conditions = []): array
     {
         $sql = "SELECT * FROM {$this->table}";
         $params = [];
@@ -40,74 +64,51 @@ abstract class Model
             $sql .= " WHERE " . implode(' AND ', $where);
         }
 
-        $sql .= " LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
-
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-
         return $stmt->fetchAll();
     }
 
     public function create(array $data): int
     {
-        $data = $this->filterFillable($data);
-
-        $columns = implode(', ', array_keys($data));
-        $placeholders = implode(', ', array_fill(0, count($data), '?'));
+        $fields = array_intersect_key($data, array_flip($this->fillable));
+        $columns = implode(', ', array_keys($fields));
+        $placeholders = implode(', ', array_fill(0, count($fields), '?'));
 
         $sql = "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
-
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(array_values($data));
+        $stmt->execute(array_values($fields));
 
         return (int) $this->db->lastInsertId();
     }
 
     public function update(int $id, array $data): bool
     {
-        $data = $this->filterFillable($data);
-
+        $fields = array_intersect_key($data, array_flip($this->fillable));
         $set = [];
-        foreach (array_keys($data) as $column) {
-            $set[] = "{$column} = ?";
+        $params = [];
+
+        foreach ($fields as $key => $value) {
+            $set[] = "{$key} = ?";
+            $params[] = $value;
         }
-
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $set) . " WHERE {$this->primaryKey} = ?";
-
-        $params = array_values($data);
         $params[] = $id;
 
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $set) . " WHERE id = ?";
         $stmt = $this->db->prepare($sql);
         return $stmt->execute($params);
     }
 
     public function delete(int $id): bool
     {
-        $stmt = $this->db->prepare("DELETE FROM {$this->table} WHERE {$this->primaryKey} = ?");
-        return $stmt->execute([$id]);
-    }
-
-    protected function filterFillable(array $data): array
-    {
-        if (empty($this->fillable)) {
-            return $data;
-        }
-
-        return array_intersect_key($data, array_flip($this->fillable));
-    }
-
-    public function query(string $sql, array $params = []): array
-    {
+        $sql = "DELETE FROM {$this->table} WHERE id = ?";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
+        return $stmt->execute([$id]);
     }
 
     public function count(array $conditions = []): int
     {
-        $sql = "SELECT COUNT(*) as total FROM {$this->table}";
+        $sql = "SELECT COUNT(*) FROM {$this->table}";
         $params = [];
 
         if (!empty($conditions)) {
@@ -121,7 +122,13 @@ abstract class Model
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-
         return (int) $stmt->fetchColumn();
+    }
+
+    public function query(string $sql, array $params = []): array
+    {
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 }

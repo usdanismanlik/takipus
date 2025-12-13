@@ -30,73 +30,65 @@ CorsMiddleware::handle();
 // Router
 $router = new Router();
 
-// Public routes
-$router->post('/api/v1/auth/login', 'AuthController@login');
+// Health check endpoint
+$router->get('/api/v1/health', 'HealthController@check');
 
-// Protected routes
-$router->group(['middleware' => 'auth'], function ($router) {
-    // Auth
-    $router->get('/api/v1/auth/me', 'AuthController@me');
-    $router->post('/api/v1/auth/logout', 'AuthController@logout');
+// Checklist Endpoints
+$router->get('/api/v1/checklists', 'ChecklistController@index');
+$router->get('/api/v1/checklists/:id', 'ChecklistController@show');
+$router->get('/api/v1/companies/:companyId/checklists', 'ChecklistController@getByCompany');
+$router->post('/api/v1/checklists', 'ChecklistController@store');
+$router->put('/api/v1/checklists/:id', 'ChecklistController@update');
+$router->delete('/api/v1/checklists/:id', 'ChecklistController@destroy');
 
-    // Dashboard
-    $router->get('/api/v1/dashboard/stats', 'DashboardController@stats');
+// Field Tour Endpoints
+$router->post('/api/v1/field-tours', 'FieldTourController@start');
+$router->get('/api/v1/field-tours', 'FieldTourController@index');
+$router->get('/api/v1/field-tours/:id', 'FieldTourController@show');
+$router->post('/api/v1/field-tours/:id/responses', 'FieldTourController@saveResponse');
+$router->put('/api/v1/field-tours/:id/complete', 'FieldTourController@complete');
 
-    // Field Tours - Specific routes first!
-    $router->get('/api/v1/field-tours/checklists', 'FieldTourController@getChecklists');
-    $router->get('/api/v1/field-tours/checklists/:id', 'FieldTourController@getChecklistWithQuestions');
-    $router->get('/api/v1/field-tours', 'FieldTourController@index');
-    $router->get('/api/v1/field-tours/:id', 'FieldTourController@show');
-    $router->post('/api/v1/field-tours', 'FieldTourController@store');
-    $router->post('/api/v1/field-tours/:id/responses', 'FieldTourController@saveResponses');
-    $router->post('/api/v1/field-tours/:id/complete', 'FieldTourController@complete');
+// File Upload Endpoints
+$router->post('/api/v1/upload', 'FileUploadController@upload');
+$router->delete('/api/v1/upload', 'FileUploadController@delete');
 
-    // Actions
-    $router->get('/api/v1/actions', 'ActionController@index');
-    $router->get('/api/v1/actions/:id', 'ActionController@show');
-    $router->post('/api/v1/actions', 'ActionController@store');
-    $router->post('/api/v1/actions/:id/comments', 'ActionController@addComment');
-    $router->get('/api/v1/actions/:id/timeline', 'ActionController@timeline');
-    $router->put('/api/v1/actions/:id/status', 'ActionController@updateStatus');
-    $router->put('/api/v1/actions/:id/assign', 'ActionController@assign');
+// Free Nonconformity Endpoints (Serbest Uygunsuzluk)
+$router->post('/api/v1/free-nonconformities', 'FreeNonConformityController@store');
+$router->get('/api/v1/free-nonconformities', 'FreeNonConformityController@index');
+$router->get('/api/v1/free-nonconformities/:id', 'FreeNonConformityController@show');
+$router->put('/api/v1/free-nonconformities/:id', 'FreeNonConformityController@update');
+$router->delete('/api/v1/free-nonconformities/:id', 'FreeNonConformityController@destroy');
 
-    // Notifications
-    $router->get('/api/v1/notifications', 'NotificationController@index');
-    $router->put('/api/v1/notifications/:id/read', 'NotificationController@markAsRead');
-    $router->put('/api/v1/notifications/read-all', 'NotificationController@markAllAsRead');
+// Action Endpoints
+$router->post('/api/v1/actions/manual', 'ActionController@createManual');
+$router->get('/api/v1/actions', 'ActionController@index');
+$router->get('/api/v1/actions/:id', 'ActionController@show');
+$router->put('/api/v1/actions/:id', 'ActionController@update');
+$router->put('/api/v1/actions/:id/complete', 'ActionController@complete');
 
-    // Helpers
-    $router->get('/api/v1/departments', 'HelperController@departments');
-    $router->get('/api/v1/users', 'HelperController@users');
+// Action Closure Endpoints (Kapatma Süreci)
+$router->post('/api/v1/actions/:id/closure-request', 'ActionController@requestClosure');
+$router->get('/api/v1/actions/:id/closures', 'ActionController@getClosures');
+$router->put('/api/v1/actions/:id/closure/:closureId/approve', 'ActionController@approveClosure');
+$router->put('/api/v1/actions/:id/closure/:closureId/reject', 'ActionController@rejectClosure');
 
-    // File upload routes
-    $router->post('/api/v1/upload', 'FileController@upload');
-    $router->delete('/api/v1/upload', 'FileController@delete');
+// Dashboard & Analytics Endpoints
+$router->get('/api/v1/dashboard/statistics', 'DashboardController@getStatistics');
+$router->get('/api/v1/dashboard/risk-matrix', 'DashboardController@getRiskMatrix');
+$router->get('/api/v1/dashboard/actions/prioritized', 'DashboardController@getPrioritizedActions');
+$router->get('/api/v1/dashboard/actions/real-time', 'DashboardController@getRealTimeActions');
 
-    // User API routes (mock - simulates external user API)
-    $router->get('/api/v1/users/:id', 'UserController@getUser');
-    $router->post('/api/v1/users/batch', 'UserController@getUsersByIds');
-    $router->get('/api/v1/users/search', 'UserController@searchUsers');
+// Periodic Inspection Endpoints
+$router->post('/api/v1/periodic-inspections', 'PeriodicInspectionController@store');
+$router->get('/api/v1/periodic-inspections', 'PeriodicInspectionController@index');
+$router->get('/api/v1/periodic-inspections/upcoming', 'PeriodicInspectionController@getUpcoming');
+$router->get('/api/v1/periodic-inspections/overdue', 'PeriodicInspectionController@getOverdue');
+$router->post('/api/v1/periodic-inspections/:id/complete', 'PeriodicInspectionController@complete');
+$router->put('/api/v1/periodic-inspections/:id', 'PeriodicInspectionController@update');
 
-    // ===== WEB PANEL ENDPOINTS =====
-
-    // Admin - Checklist Management
-    $router->get('/api/v1/admin/checklists', 'AdminChecklistController@index');
-    $router->post('/api/v1/admin/checklists', 'AdminChecklistController@store');
-    $router->put('/api/v1/admin/checklists/:id', 'AdminChecklistController@update');
-    $router->delete('/api/v1/admin/checklists/:id', 'AdminChecklistController@destroy');
-    $router->post('/api/v1/admin/checklists/:id/duplicate', 'AdminChecklistController@duplicate');
-
-    // Analytics
-    $router->get('/api/v1/analytics/overview', 'AnalyticsController@overview');
-    $router->get('/api/v1/analytics/by-department', 'AnalyticsController@byDepartment');
-    $router->get('/api/v1/analytics/trends', 'AnalyticsController@trends');
-    $router->get('/api/v1/analytics/risk-distribution', 'AnalyticsController@riskDistribution');
-
-    // Approvals
-    $router->get('/api/v1/approvals/closure-requests', 'ApprovalController@closureRequests');
-    $router->post('/api/v1/approvals/closure-requests/:id/approve', 'ApprovalController@approve');
-    $router->post('/api/v1/approvals/closure-requests/:id/reject', 'ApprovalController@reject');
-});
+// Export Endpoints
+$router->get('/api/v1/export/actions/excel', 'ExportController@exportActionsExcel');
+$router->get('/api/v1/export/actions/csv', 'ExportController@exportActionsCsv');
+$router->get('/api/v1/export/actions/json', 'ExportController@exportActionsJson');
 
 $router->dispatch();

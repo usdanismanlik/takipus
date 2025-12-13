@@ -1,0 +1,42 @@
+{
+  "company_id": "F12345",
+  "name": "Kimyasal Güvenlik Denetimi",
+  "description": "Kimyasal madde depolama ve kullanım kontrolleri",
+  "status": "active",
+  "questions": [
+    {
+      "order_num": 1,
+      "question_text": "Kimyasal madde depolama alanı uygun mu?",
+      "question_type": "yes_no",
+      "is_required": true,
+      "photo_required": true,
+      "help_text": "Depolama alanı havalandırmalı ve etiketli olmalıdır"
+    },
+    {
+      "order_num": 2,
+      "question_text": "MSDS (Malzeme Güvenlik Bilgi Formu) mevcut mu?",
+      "question_type": "yes_no",
+      "is_required": true,
+      "photo_required": false,
+      "help_text": "Tüm kimyasallar için MSDS bulunmalıdır"
+    },
+    {
+      "order_num": 3,
+      "question_text": "Depolama alanı temizlik durumu (1-5 arası)",
+      "question_type": "score",
+      "is_required": true,
+      "photo_required": false,
+      "help_text": "1: Çok kötü, 5: Mükemmel",
+      "min_score": 1,
+      "max_score": 5
+    },
+    {
+      "order_num": 4,
+      "question_text": "Ek gözlemler ve notlar",
+      "question_type": "text",
+      "is_required": false,
+      "photo_required": false,
+      "help_text": "Varsa diğer gözlemlerinizi buraya yazınız"
+    }
+  ]
+}

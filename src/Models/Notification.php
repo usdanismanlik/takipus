@@ -11,23 +11,39 @@ class Notification extends Model
         'type',
         'title',
         'message',
-        'data',
+        'related_type',
+        'related_id',
         'is_read',
         'read_at',
     ];
 
-    public function markAsRead(int $id): bool
+    public function getByUser(int $userId, bool $unreadOnly = false): array
     {
-        return $this->update($id, [
-            'is_read' => true,
-            'read_at' => date('Y-m-d H:i:s'),
-        ]);
+        $sql = "SELECT * FROM {$this->table} WHERE user_id = ?";
+        $params = [$userId];
+
+        if ($unreadOnly) {
+            $sql .= " AND is_read = 0";
+        }
+
+        $sql .= " ORDER BY created_at DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 
-    public function markAllAsRead(int $userId): bool
+    public function markAsRead(int $id): bool
     {
-        $sql = "UPDATE {$this->table} SET is_read = 1, read_at = ? WHERE user_id = ? AND is_read = 0";
+        $sql = "UPDATE {$this->table} SET is_read = 1, read_at = NOW() WHERE id = ?";
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([date('Y-m-d H:i:s'), $userId]);
+        return $stmt->execute([$id]);
+    }
+
+    public function markAllAsReadForUser(int $userId): bool
+    {
+        $sql = "UPDATE {$this->table} SET is_read = 1, read_at = NOW() WHERE user_id = ? AND is_read = 0";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$userId]);
     }
 }

@@ -20,7 +20,11 @@ class AuthMiddleware
                 return false;
             }
 
+            // Token'dan kullanıcı bilgilerini al
             $GLOBALS['auth_user_id'] = $payload->user_id;
+            $GLOBALS['auth_user_role'] = $payload->role ?? 'user';
+            $GLOBALS['auth_user_permissions'] = $payload->permissions ?? [];
+            $GLOBALS['auth_company_id'] = $payload->company_id ?? null;
             return true;
         }
 
@@ -35,11 +39,39 @@ class AuthMiddleware
         }
 
         $GLOBALS['auth_user_id'] = $_SESSION['user_id'];
+        $GLOBALS['auth_user_role'] = $_SESSION['user_role'] ?? 'user';
+        $GLOBALS['auth_user_permissions'] = $_SESSION['user_permissions'] ?? [];
+        $GLOBALS['auth_company_id'] = $_SESSION['company_id'] ?? null;
         return true;
     }
 
     public static function getUserId(): ?int
     {
         return $GLOBALS['auth_user_id'] ?? null;
+    }
+
+    public static function getUserRole(): ?string
+    {
+        return $GLOBALS['auth_user_role'] ?? null;
+    }
+
+    public static function getUserPermissions(): array
+    {
+        return $GLOBALS['auth_user_permissions'] ?? [];
+    }
+
+    public static function getCompanyId(): ?string
+    {
+        return $GLOBALS['auth_company_id'] ?? null;
+    }
+
+    public static function getAuthUser(): array
+    {
+        return [
+            'user_id' => self::getUserId(),
+            'role' => self::getUserRole(),
+            'permissions' => self::getUserPermissions(),
+            'company_id' => self::getCompanyId(),
+        ];
     }
 }

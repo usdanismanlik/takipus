@@ -2,236 +2,357 @@
 
 namespace Src\Controllers;
 
-use Src\Models\Checklist;
 use Src\Models\FieldTour;
-use Src\Middleware\AuthMiddleware;
+use Src\Models\FieldTourResponse;
+use Src\Models\Checklist;
+use Src\Models\ChecklistQuestion;
+use Src\Models\Action;
+use Src\Models\Notification;
 use Src\Helpers\Response;
-use Src\Config\Database;
-use PDO;
-use Exception;
+use Src\Helpers\AuditLogger;
+use Src\Helpers\RiskMatrix;
 
 class FieldTourController
 {
+    private FieldTour $tourModel;
+    private FieldTourResponse $responseModel;
     private Checklist $checklistModel;
-    private FieldTour $fieldTourModel;
+    private ChecklistQuestion $questionModel;
+    private Action $actionModel;
+    private Notification $notificationModel;
 
     public function __construct()
     {
+        $this->tourModel = new FieldTour();
+        $this->responseModel = new FieldTourResponse();
         $this->checklistModel = new Checklist();
-        $this->fieldTourModel = new FieldTour();
+        $this->questionModel = new ChecklistQuestion();
+        $this->actionModel = new Action();
+        $this->notificationModel = new Notification();
     }
 
     /**
-     * Get all active checklists
+     * POST /api/v1/field-tours
+     * Yeni saha turu başlat
      */
-    public function getChecklists(): void
+    public function start(): void
     {
-        $checklists = $this->checklistModel->all(['status' => 'active']);
+        $data = json_decode(file_get_contents('php://input'), true);
 
-        // Add question count
-        foreach ($checklists as &$checklist) {
-            $sql = "SELECT COUNT(*) as count FROM checklist_questions WHERE checklist_id = ?";
-            $stmt = $this->checklistModel->db->prepare($sql);
-            $stmt->execute([$checklist['id']]);
-            $checklist['question_count'] = (int) $stmt->fetchColumn();
-        }
-
-        Response::success($checklists);
-    }
-
-    /**
-     * Get checklist with questions
-     */
-    public function getChecklistWithQuestions(int $id): void
-    {
-        $checklist = $this->checklistModel->withQuestions($id);
-
-        if (!$checklist) {
-            Response::error('Checklist not found', 404);
+        // Validasyon
+        if (!isset($data['company_id']) || !isset($data['checklist_id']) || !isset($data['inspector_user_id'])) {
+            Response::error('company_id, checklist_id ve inspector_user_id zorunludur', 422);
             return;
         }
 
-        Response::success($checklist);
+        // Checklist var mı ve aktif mi kontrol et
+        $checklist = $this->checklistModel->find($data['checklist_id']);
+        if (!$checklist) {
+            Response::error('Checklist bulunamadı', 404);
+            return;
+        }
+
+        if ($checklist['status'] !== 'active') {
+            Response::error('Sadece aktif checklist\'ler için tur başlatılabilir', 422);
+            return;
+        }
+
+        // Saha turu oluştur
+        $tourId = $this->tourModel->create([
+            'company_id' => $data['company_id'],
+            'checklist_id' => $data['checklist_id'],
+            'inspector_user_id' => $data['inspector_user_id'],
+            'location' => $data['location'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'status' => 'in_progress',
+        ]);
+
+        $tour = $this->tourModel->find($tourId);
+        
+        // Checklist sorularını da döndür
+        $questions = $this->questionModel->getByChecklist($data['checklist_id']);
+        $tour['checklist'] = $checklist;
+        $tour['questions'] = $questions;
+        
+        // Audit log
+        AuditLogger::logCreate(
+            '/api/v1/field-tours',
+            'field_tour',
+            $tourId,
+            $tour,
+            $data['inspector_user_id']
+        );
+
+        Response::success($tour, 'Saha turu başlatıldı', 201);
     }
 
     /**
-     * Get all field tours
+     * POST /api/v1/field-tours/:id/responses
+     * Saha turunda soru cevapla
      */
-    public function index(): void
+    public function saveResponse(int $tourId): void
     {
-        $tours = $this->fieldTourModel->all();
-        Response::success($tours);
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        // Tur var mı kontrol et
+        $tour = $this->tourModel->find($tourId);
+        if (!$tour) {
+            Response::error('Saha turu bulunamadı', 404);
+            return;
+        }
+
+        if ($tour['status'] !== 'in_progress') {
+            Response::error('Sadece devam eden turlara cevap eklenebilir', 422);
+            return;
+        }
+
+        // Validasyon
+        if (!isset($data['question_id']) || !isset($data['answer_value'])) {
+            Response::error('question_id ve answer_value zorunludur', 422);
+            return;
+        }
+
+        // Soru var mı kontrol et
+        $question = $this->questionModel->find($data['question_id']);
+        if (!$question) {
+            Response::error('Soru bulunamadı', 404);
+            return;
+        }
+
+        // is_compliant kontrolü - yes_no tipinde "no" ise uygunsuz
+        $isCompliant = 1;
+        if ($question['question_type'] === 'yes_no' && strtolower($data['answer_value']) === 'no') {
+            $isCompliant = 0;
+        } elseif (isset($data['is_compliant'])) {
+            $isCompliant = (int)$data['is_compliant'];
+        }
+
+        // Fotoğrafları JSON olarak kaydet
+        $photos = null;
+        if (isset($data['photos']) && is_array($data['photos'])) {
+            $photos = json_encode($data['photos']);
+        }
+
+        // Cevabı kaydet
+        $responseId = $this->responseModel->create([
+            'field_tour_id' => $tourId,
+            'question_id' => $data['question_id'],
+            'answer_type' => $question['question_type'],
+            'answer_value' => $data['answer_value'],
+            'is_compliant' => $isCompliant,
+            'notes' => $data['notes'] ?? null,
+            'photos' => $photos,
+            'location' => $data['location'] ?? null,
+            'risk_score' => $data['risk_score'] ?? null,
+            'priority' => $data['priority'] ?? 'medium',
+        ]);
+
+        $response = $this->responseModel->find($responseId);
+
+        // Uygunsuzluk varsa aksiyon oluştur ve bildirim gönder
+        if ($isCompliant == 0) {
+            $this->createActionForNonCompliance($tour, $question, $response, $data);
+        }
+        
+        // Audit log
+        AuditLogger::logCreate(
+            '/api/v1/field-tours/' . $tourId . '/responses',
+            'field_tour_response',
+            $responseId,
+            $response,
+            $tour['inspector_user_id']
+        );
+
+        Response::success($response, 'Cevap kaydedildi', 201);
     }
 
     /**
-     * Get single field tour
+     * Uygunsuzluk için aksiyon oluştur ve bildirimleri gönder
+     */
+    private function createActionForNonCompliance(array $tour, array $question, array $response, array $data): void
+    {
+        // Checklist bilgisini al
+        $checklist = $this->checklistModel->find($tour['checklist_id']);
+
+        // Aksiyon başlığı ve açıklaması oluştur
+        $title = "Uygunsuzluk: " . substr($question['question_text'], 0, 100);
+        $description = $question['question_text'] . "\n\n";
+        $description .= "Cevap: " . $response['answer_value'] . "\n";
+        if ($response['notes']) {
+            $description .= "Notlar: " . $response['notes'];
+        }
+
+        // Termin uyarı günlerini JSON olarak kaydet
+        $reminderDays = null;
+        if (isset($data['due_date_reminder_days']) && is_array($data['due_date_reminder_days'])) {
+            $reminderDays = json_encode($data['due_date_reminder_days']);
+        } elseif (isset($data['due_date'])) {
+            // Varsayılan uyarı günleri: 7, 3, 1
+            $reminderDays = json_encode([7, 3, 1]);
+        }
+
+        // Risk matrisi hesaplama
+        $riskProbability = $data['risk_probability'] ?? 3;
+        $riskSeverity = $data['risk_severity'] ?? 3;
+        $riskInfo = RiskMatrix::calculateRisk($riskProbability, $riskSeverity);
+
+        // Aksiyonu oluştur
+        $actionId = $this->actionModel->create([
+            'company_id' => $tour['company_id'],
+            'field_tour_id' => $tour['id'],
+            'response_id' => $response['id'],
+            'title' => $title,
+            'description' => $description,
+            'location' => $response['location'] ?? $tour['location'],
+            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+            'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
+            'status' => 'open',
+            'priority' => $riskInfo['priority'],
+            'risk_score' => $riskInfo['score'],
+            'risk_probability' => $riskProbability,
+            'risk_severity' => $riskSeverity,
+            'risk_level' => $riskInfo['level'],
+            'source_type' => 'field_tour',
+            'due_date' => $data['due_date'] ?? null,
+            'due_date_reminder_days' => $reminderDays,
+            'created_by' => $tour['inspector_user_id'],
+        ]);
+
+        // Bildirimleri oluştur
+        $this->createNotifications($checklist, $question, $actionId, $tour);
+    }
+
+    /**
+     * Bildirim oluştur
+     */
+    private function createNotifications(array $checklist, array $question, int $actionId, array $tour): void
+    {
+        $notifiedUsers = [];
+
+        // 1. Checklist genel sorumlusuna bildirim
+        if ($checklist['general_responsible_id']) {
+            $this->notificationModel->create([
+                'user_id' => $checklist['general_responsible_id'],
+                'type' => 'checklist_nonconformity',
+                'title' => 'Yeni Uygunsuzluk Tespit Edildi',
+                'message' => "'{$checklist['name']}' checklist'inde uygunsuzluk tespit edildi.",
+                'related_type' => 'action',
+                'related_id' => $actionId,
+            ]);
+            $notifiedUsers[] = $checklist['general_responsible_id'];
+        }
+
+        // 2. Soru bazında sorumlu kişilere bildirim
+        if ($question['responsible_user_ids']) {
+            $responsibleIds = json_decode($question['responsible_user_ids'], true);
+            if (is_array($responsibleIds)) {
+                foreach ($responsibleIds as $userId) {
+                    // Aynı kişiye birden fazla bildirim gönderme
+                    if (!in_array($userId, $notifiedUsers)) {
+                        $this->notificationModel->create([
+                            'user_id' => $userId,
+                            'type' => 'action_created',
+                            'title' => 'Size Aksiyon Atandı',
+                            'message' => "Saha turunda tespit edilen uygunsuzluk için size aksiyon atandı.",
+                            'related_type' => 'action',
+                            'related_id' => $actionId,
+                        ]);
+                        $notifiedUsers[] = $userId;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * GET /api/v1/field-tours/:id
+     * Saha turu detayı
      */
     public function show(int $id): void
     {
-        $tour = $this->fieldTourModel->find($id);
+        $tour = $this->tourModel->getWithResponses($id);
 
         if (!$tour) {
-            Response::error('Field tour not found', 404);
+            Response::error('Saha turu bulunamadı', 404);
             return;
         }
 
-        // Get checklist name
-        $checklist = $this->checklistModel->find($tour['checklist_id']);
-        $tour['checklist_name'] = $checklist['name'] ?? null;
+        // Checklist bilgisini ekle
+        $checklist = $this->checklistModel->withQuestions($tour['checklist_id']);
+        $tour['checklist'] = $checklist;
+
+        // Decode JSON fields
+        foreach ($tour['responses'] as &$response) {
+            if ($response['photos']) {
+                $response['photos'] = json_decode($response['photos'], true);
+            }
+        }
 
         Response::success($tour);
     }
 
-    public function store(): void
+    /**
+     * GET /api/v1/field-tours
+     * Saha turlarını listele
+     */
+    public function index(): void
     {
-        $data = json_decode(file_get_contents('php://input'), true);
+        $companyId = $_GET['company_id'] ?? null;
+        $status = $_GET['status'] ?? null;
 
-        if (!isset($data['checklist_id'])) {
-            Response::error('Checklist ID is required', 422);
+        if (!$companyId) {
+            Response::error('company_id parametresi zorunludur', 422);
             return;
         }
 
-        $userId = AuthMiddleware::getUserId();
+        $tours = $this->tourModel->getByCompany($companyId, $status);
 
-        $id = $this->fieldTourModel->create([
-            'checklist_id' => $data['checklist_id'],
-            'inspector_id' => $userId,
-            'location' => $data['location'] ?? null,
-            'status' => 'in_progress',
-            'started_at' => date('Y-m-d H:i:s'),
-        ]);
+        // Her tur için cevap sayısını ekle
+        foreach ($tours as &$tour) {
+            $responses = $this->responseModel->getByTour($tour['id']);
+            $tour['response_count'] = count($responses);
+            $tour['non_compliant_count'] = count(array_filter($responses, fn($r) => $r['is_compliant'] == 0));
+        }
 
-        $fieldTour = $this->fieldTourModel->find($id);
-
-        Response::success($fieldTour, 'Field tour started', 201);
+        Response::success($tours);
     }
 
     /**
-     * Save field tour responses
+     * PUT /api/v1/field-tours/:id/complete
+     * Saha turunu tamamla
      */
-    public function saveResponses(int $id): void
-    {
-        $data = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($data['responses']) || !is_array($data['responses'])) {
-            Response::error('Responses array is required', 422);
-            return;
-        }
-
-        try {
-            $saved = 0;
-            foreach ($data['responses'] as $response) {
-                // Use REPLACE INTO to avoid duplicate key errors
-                $sql = "REPLACE INTO field_tour_responses (field_tour_id, question_id, answer, notes, photo) VALUES (?, ?, ?, ?, ?)";
-                $stmt = $this->fieldTourModel->db->prepare($sql);
-                $stmt->execute([
-                    $id,
-                    $response['question_id'],
-                    $response['answer'] ?? null,
-                    $response['notes'] ?? null,
-                    $response['photo'] ?? null,
-                ]);
-                $saved++;
-            }
-
-            Response::success([
-                'field_tour_id' => $id,
-                'responses_saved' => $saved,
-            ]);
-        } catch (\Exception $e) {
-            error_log("Save responses error: " . $e->getMessage());
-            Response::error('Failed to save responses: ' . $e->getMessage(), 500);
-        }
-    }
-
     public function complete(int $id): void
     {
-        $data = json_decode(file_get_contents('php://input'), true);
+        $tour = $this->tourModel->find($id);
 
-        $this->fieldTourModel->complete($id, [
-            'summary' => $data['summary'] ?? null,
-            'overall_score' => $data['overall_score'] ?? null,
-        ]);
-
-        $fieldTour = $this->fieldTourModel->find($id);
-
-        // Auto-create actions for "no" answers
-        $this->createActionsForNoAnswers($id);
-
-        Response::success($fieldTour, 'Field tour completed');
-    }
-
-    /**
-     * Create actions for "no" answers in field tour
-     */
-    private function createActionsForNoAnswers(int $tourId): void
-    {
-        try {
-            $db = Database::getConnection();
-
-            // Get field tour info
-            $tourStmt = $db->prepare("
-                SELECT ft.*, c.name as checklist_name 
-                FROM field_tours ft
-                LEFT JOIN checklists c ON ft.checklist_id = c.id
-                WHERE ft.id = ?
-            ");
-            $tourStmt->execute([$tourId]);
-            $tour = $tourStmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$tour)
-                return;
-
-            // Get all "no" responses with question details
-            $stmt = $db->prepare("
-                SELECT ftr.*, q.text as question_text
-                FROM field_tour_responses ftr
-                INNER JOIN checklist_questions q ON ftr.question_id = q.id
-                WHERE ftr.field_tour_id = ? AND ftr.answer = 'no'
-            ");
-            $stmt->execute([$tourId]);
-            $noResponses = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($noResponses as $response) {
-                // Create action for each "no" answer
-                $actionCode = 'FT-' . $tourId . '-' . $response['question_id'];
-
-                $actionStmt = $db->prepare("
-                    INSERT INTO actions (
-                        code,
-                        title, 
-                        description, 
-                        priority, 
-                        status,
-                        source,
-                        assigned_by_user_id,
-                        created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-                ");
-
-                $title = "Saha Turu: " . $response['question_text'];
-                $description = "Saha Turu Lokasyonu: " . $tour['location'] . "\n";
-                $description .= "Checklist: " . $tour['checklist_name'] . "\n";
-                $description .= "Soru: " . $response['question_text'] . "\n";
-                if ($response['notes']) {
-                    $description .= "Notlar: " . $response['notes'] . "\n";
-                }
-                if ($response['photo']) {
-                    $description .= "Fotoğraf: " . $response['photo'];
-                }
-
-                $actionStmt->execute([
-                    $actionCode,
-                    $title,
-                    $description,
-                    'high', // High priority for "no" answers
-                    'open',
-                    'field_tour',
-                    $tour['inspector_id']
-                ]);
-            }
-        } catch (Exception $e) {
-            error_log("Error creating actions for field tour {$tourId}: " . $e->getMessage());
+        if (!$tour) {
+            Response::error('Saha turu bulunamadı', 404);
+            return;
         }
+
+        if ($tour['status'] !== 'in_progress') {
+            Response::error('Sadece devam eden turlar tamamlanabilir', 422);
+            return;
+        }
+
+        $oldValues = $tour;
+        
+        $this->tourModel->update($id, [
+            'status' => 'completed',
+            'completed_at' => date('Y-m-d H:i:s'),
+        ]);
+        
+        // Audit log
+        $updatedTour = $this->tourModel->getWithResponses($id);
+        AuditLogger::logUpdate(
+            '/api/v1/field-tours/' . $id . '/complete',
+            'field_tour',
+            $id,
+            $oldValues,
+            $updatedTour,
+            $tour['inspector_user_id']
+        );
+        
+        Response::success($updatedTour, 'Saha turu tamamlandı');
     }
 }
