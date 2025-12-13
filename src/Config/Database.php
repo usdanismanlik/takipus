@@ -13,11 +13,14 @@ class Database
     {
         if (self::$connection === null) {
             try {
-                $host = $_ENV['DB_HOST'];
-                $port = $_ENV['DB_PORT'];
-                $dbname = $_ENV['DB_NAME'];
-                $username = $_ENV['DB_USER'];
-                $password = $_ENV['DB_PASS'];
+                $host = $_ENV['DB_HOST'] ?? 'mysql';
+                $port = $_ENV['DB_PORT'] ?? '3306';
+                $dbname = $_ENV['DB_NAME'] ?? 'hse_db';
+                $username = $_ENV['DB_USER'] ?? 'hse_user';
+                $password = $_ENV['DB_PASSWORD'] ?? '';
+
+                // Debug log (production'da kaldırılacak)
+                error_log("DB Connection Attempt - Host: {$host}, Port: {$port}, DB: {$dbname}, User: {$username}");
 
                 $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 
@@ -26,11 +29,17 @@ class Database
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false,
                 ]);
+                
+                error_log("DB Connection SUCCESS");
             } catch (PDOException $e) {
                 error_log("Database connection failed: " . $e->getMessage());
+                error_log("Connection details - Host: {$host}, Port: {$port}, DB: {$dbname}, User: {$username}");
                 die(json_encode([
                     'success' => false,
-                    'error' => ['message' => 'Database connection failed']
+                    'error' => [
+                        'message' => 'Database connection failed',
+                        'details' => $e->getMessage()
+                    ]
                 ]));
             }
         }
