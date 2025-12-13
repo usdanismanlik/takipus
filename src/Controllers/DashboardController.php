@@ -5,6 +5,7 @@ namespace Src\Controllers;
 use Src\Models\Action;
 use Src\Helpers\Response;
 use Src\Helpers\RiskMatrix;
+use Src\Config\Database;
 
 class DashboardController
 {
@@ -13,6 +14,11 @@ class DashboardController
     public function __construct()
     {
         $this->actionModel = new Action();
+    }
+    
+    private function getDb(): \PDO
+    {
+        return Database::getConnection();
     }
 
     /**
@@ -89,7 +95,7 @@ class DashboardController
                 LIMIT 50";
 
         $params = array_merge([$companyId], $statusArray);
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute($params);
         $actions = $stmt->fetchAll();
 
@@ -129,7 +135,7 @@ class DashboardController
                 AND a.status != 'cancelled'
                 ORDER BY calculated_risk_score DESC, a.due_date ASC";
 
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         $actions = $stmt->fetchAll();
 
@@ -162,7 +168,7 @@ class DashboardController
     private function getTotalActions(string $companyId): int
     {
         $sql = "SELECT COUNT(*) as count FROM actions WHERE company_id = ?";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return (int)$stmt->fetch()['count'];
     }
@@ -172,7 +178,7 @@ class DashboardController
         $sql = "SELECT COUNT(*) as count FROM actions 
                 WHERE company_id = ? 
                 AND status IN ('open', 'in_progress', 'pending_approval')";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return (int)$stmt->fetch()['count'];
     }
@@ -183,7 +189,7 @@ class DashboardController
                 WHERE company_id = ? 
                 AND status IN ('open', 'in_progress')
                 AND risk_level IN ('high', 'very_high')";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return (int)$stmt->fetch()['count'];
     }
@@ -194,7 +200,7 @@ class DashboardController
                 WHERE company_id = ? 
                 AND status IN ('open', 'in_progress', 'pending_approval')
                 AND due_date < CURDATE()";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return (int)$stmt->fetch()['count'];
     }
@@ -206,7 +212,7 @@ class DashboardController
                 AND status = 'completed'
                 AND MONTH(completed_at) = MONTH(CURDATE())
                 AND YEAR(completed_at) = YEAR(CURDATE())";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return (int)$stmt->fetch()['count'];
     }
@@ -217,7 +223,7 @@ class DashboardController
                 FROM actions 
                 WHERE company_id = ? 
                 GROUP BY status";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return $stmt->fetchAll();
     }
@@ -230,7 +236,7 @@ class DashboardController
                 AND status IN ('open', 'in_progress', 'pending_approval')
                 AND risk_level IS NOT NULL
                 GROUP BY risk_level";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return $stmt->fetchAll();
     }
@@ -243,7 +249,7 @@ class DashboardController
                 AND status IN ('open', 'in_progress', 'pending_approval')
                 AND assigned_to_department_id IS NOT NULL
                 GROUP BY assigned_to_department_id";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return $stmt->fetchAll();
     }
@@ -255,7 +261,7 @@ class DashboardController
                 WHERE company_id = ? 
                 AND status IN ('open', 'in_progress', 'pending_approval')
                 GROUP BY source_type";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return $stmt->fetchAll();
     }
@@ -267,7 +273,7 @@ class DashboardController
                 WHERE company_id = ? 
                 AND status IN ('open', 'in_progress', 'pending_approval')
                 GROUP BY priority";
-        $stmt = $this->actionModel->db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$companyId]);
         return $stmt->fetchAll();
     }
