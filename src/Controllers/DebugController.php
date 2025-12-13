@@ -70,14 +70,14 @@ class DebugController
             ], 'Database connection successful');
 
         } catch (\PDOException $e) {
-            Response::error([
+            Response::error('Database connection failed: ' . $e->getMessage(), 500, [
                 'connection' => 'FAILED',
                 'error' => $e->getMessage(),
                 'host' => $host ?? 'unknown',
                 'port' => $port ?? 'unknown',
                 'database' => $dbname ?? 'unknown',
                 'username' => $username ?? 'unknown',
-            ], 500);
+            ]);
         }
     }
 }
