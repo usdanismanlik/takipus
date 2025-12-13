@@ -33,6 +33,10 @@ $router = new Router();
 // Health check endpoint
 $router->get('/api/v1/health', 'HealthController@check');
 
+// Debug Endpoints (Remove in production)
+$router->get('/api/v1/debug/env', 'DebugController@envInfo');
+$router->get('/api/v1/debug/db', 'DebugController@testDbConnection');
+
 // Checklist Endpoints
 $router->get('/api/v1/checklists', 'ChecklistController@index');
 $router->get('/api/v1/checklists/:id', 'ChecklistController@show');
