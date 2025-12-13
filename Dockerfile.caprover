@@ -22,6 +22,15 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
+# Default environment variables (CapRover will override these)
+ENV DB_HOST=mysql \
+    DB_PORT=3306 \
+    DB_NAME=hse_db \
+    DB_USER=root \
+    DB_PASSWORD="" \
+    APP_ENV=production \
+    APP_DEBUG=false
+
 # Copy application files
 COPY . .
 

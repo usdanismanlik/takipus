@@ -20,14 +20,17 @@ class Database
                 $username = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'hse_user');
                 $password = getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? '');
 
-                // Debug log
-                error_log("=== DB Connection Debug ===");
-                error_log("Host: {$host}");
-                error_log("Port: {$port}");
-                error_log("Database: {$dbname}");
-                error_log("Username: {$username}");
-                error_log("Password set: " . (!empty($password) ? 'YES' : 'NO'));
-                error_log("========================");
+                // Debug log - STDOUT'a da yaz
+                $debug = "=== DB Connection Debug ===\n";
+                $debug .= "Host: {$host}\n";
+                $debug .= "Port: {$port}\n";
+                $debug .= "Database: {$dbname}\n";
+                $debug .= "Username: {$username}\n";
+                $debug .= "Password set: " . (!empty($password) ? 'YES (' . strlen($password) . ' chars)' : 'NO') . "\n";
+                $debug .= "========================\n";
+                
+                error_log($debug);
+                file_put_contents('php://stderr', $debug);
 
                 $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 
