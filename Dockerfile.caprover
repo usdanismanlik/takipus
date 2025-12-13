@@ -30,8 +30,11 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Create necessary directories and set permissions
 RUN mkdir -p storage/logs storage/uploads \
+    /var/log/supervisor \
+    /var/run \
     && chown -R www-data:www-data storage \
-    && chmod -R 775 storage
+    && chmod -R 775 storage \
+    && chmod -R 755 /var/log/supervisor
 
 # Copy Nginx configuration
 COPY docker/caprover/nginx.conf /etc/nginx/nginx.conf
