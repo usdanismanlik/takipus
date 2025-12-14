@@ -390,8 +390,16 @@ class ActionController
 
         // Kanıt dosyalarını JSON olarak kaydet
         $evidenceFiles = null;
-        if (isset($data['evidence_files']) && is_array($data['evidence_files'])) {
-            $evidenceFiles = json_encode($data['evidence_files']);
+        if (isset($data['evidence_files']) && !empty($data['evidence_files'])) {
+            if (is_string($data['evidence_files'])) {
+                // JSON string olarak gelirse decode et
+                $filesArray = json_decode($data['evidence_files'], true);
+                if (is_array($filesArray) && !empty($filesArray)) {
+                    $evidenceFiles = json_encode($filesArray);
+                }
+            } elseif (is_array($data['evidence_files']) && !empty($data['evidence_files'])) {
+                $evidenceFiles = json_encode($data['evidence_files']);
+            }
         }
 
         // Kapatma talebi oluştur
