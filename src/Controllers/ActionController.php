@@ -166,14 +166,19 @@ class ActionController
         }
 
         // Response fotoğraflarını ekle (field tour'dan gelen)
-        if ($action['response_id']) {
+        if ($action['response_id'] && $action['response_id'] > 0) {
             $stmt = $this->db->prepare("SELECT photos FROM field_tour_responses WHERE id = ?");
             $stmt->execute([$action['response_id']]);
             $response = $stmt->fetch();
             
-            if ($response && $response['photos']) {
-                $action['response_photos'] = json_decode($response['photos'], true);
+            if ($response && !empty($response['photos'])) {
+                $photos = json_decode($response['photos'], true);
+                $action['response_photos'] = is_array($photos) ? $photos : [];
+            } else {
+                $action['response_photos'] = [];
             }
+        } else {
+            $action['response_photos'] = [];
         }
 
         // Closure bilgilerini ekle (kapatma talebi)
@@ -181,9 +186,21 @@ class ActionController
         if ($closure) {
             $action['closure_id'] = $closure['id'];
             $action['closure_notes'] = $closure['closure_description'];
-            $action['closure_photos'] = $closure['evidence_files'] ? json_decode($closure['evidence_files'], true) : null;
+            
+            if (!empty($closure['evidence_files'])) {
+                $photos = json_decode($closure['evidence_files'], true);
+                $action['closure_photos'] = is_array($photos) ? $photos : [];
+            } else {
+                $action['closure_photos'] = [];
+            }
+            
             $action['approval_notes'] = $closure['approval_notes'];
             $action['rejection_notes'] = $closure['rejection_notes'];
+        } else {
+            $action['closure_photos'] = [];
+            $action['closure_notes'] = null;
+            $action['approval_notes'] = null;
+            $action['rejection_notes'] = null;
         }
 
         Response::success($action);
