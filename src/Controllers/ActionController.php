@@ -511,11 +511,13 @@ class ActionController
             ]);
 
             // Tamamlama bildirimi
-            $action = $this->actionModel->find($id);
-            $this->sendClosureApprovedNotifications($action, $updatedClosure);
+            // TODO: Bildirim servisi implement edilecek
+            // $action = $this->actionModel->find($id);
+            // $this->sendClosureApprovedNotifications($action, $updatedClosure);
         } elseif ($closure['requires_upper_approval'] && !$isUpperApproval) {
             // Üst amir onayı için bildirim gönder
-            $this->sendUpperApprovalRequestNotification($id, $closureId);
+            // TODO: Bildirim servisi implement edilecek
+            // $this->sendUpperApprovalRequestNotification($id, $closureId);
         }
 
         // Audit log
@@ -571,8 +573,9 @@ class ActionController
         $this->actionModel->update($id, ['status' => 'in_progress']);
 
         // Reddedilme bildirimi
-        $action = $this->actionModel->find($id);
-        $this->sendClosureRejectedNotifications($action, $closure, $data['review_notes']);
+        // TODO: Bildirim servisi implement edilecek
+        // $action = $this->actionModel->find($id);
+        // $this->sendClosureRejectedNotifications($action, $closure, $data['review_notes']);
 
         // Audit log
         $updatedClosure = $this->closureModel->find($closureId);
