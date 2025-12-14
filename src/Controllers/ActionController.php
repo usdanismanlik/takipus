@@ -161,6 +161,28 @@ class ActionController
             $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
         }
 
+        // Response fotoğraflarını ekle (field tour'dan gelen)
+        if ($action['response_id']) {
+            $response = $this->db->query(
+                "SELECT photos FROM field_tour_responses WHERE id = ?",
+                [$action['response_id']]
+            )->fetch();
+            
+            if ($response && $response['photos']) {
+                $action['response_photos'] = json_decode($response['photos'], true);
+            }
+        }
+
+        // Closure bilgilerini ekle (kapatma talebi)
+        $closure = $this->closureModel->getLatestByAction($id);
+        if ($closure) {
+            $action['closure_id'] = $closure['id'];
+            $action['closure_notes'] = $closure['closure_description'];
+            $action['closure_photos'] = $closure['evidence_files'] ? json_decode($closure['evidence_files'], true) : null;
+            $action['approval_notes'] = $closure['approval_notes'];
+            $action['rejection_notes'] = $closure['rejection_notes'];
+        }
+
         Response::success($action);
     }
 
@@ -337,8 +359,8 @@ class ActionController
         // Aksiyonun durumunu 'pending_approval' yap
         $this->actionModel->update($id, ['status' => 'pending_approval']);
 
-        // Bildirimleri gönder
-        $this->sendClosureRequestNotifications($action, $closureId);
+        // TODO: Bildirimleri gönder (NotificationService implement edilecek)
+        // $this->sendClosureRequestNotifications($action, $closureId);
 
         // Audit log
         $closure = $this->closureModel->find($closureId);
