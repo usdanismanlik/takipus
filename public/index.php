@@ -95,4 +95,10 @@ $router->get('/api/v1/export/actions/excel', 'ExportController@exportActionsExce
 $router->get('/api/v1/export/actions/csv', 'ExportController@exportActionsCsv');
 $router->get('/api/v1/export/actions/json', 'ExportController@exportActionsJson');
 
+// Notification Endpoints (Debug)
+$router->get('/api/v1/notifications', 'NotificationController@index');
+$router->get('/api/v1/notifications/user/:userId', 'NotificationController@getByUser');
+$router->put('/api/v1/notifications/:id/read', 'NotificationController@markAsRead');
+$router->put('/api/v1/notifications/user/:userId/read-all', 'NotificationController@markAllAsRead');
+
 $router->dispatch();
