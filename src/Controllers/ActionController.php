@@ -167,10 +167,9 @@ class ActionController
 
         // Response fotoğraflarını ekle (field tour'dan gelen)
         if ($action['response_id']) {
-            $response = $this->db->query(
-                "SELECT photos FROM field_tour_responses WHERE id = ?",
-                [$action['response_id']]
-            )->fetch();
+            $stmt = $this->db->prepare("SELECT photos FROM field_tour_responses WHERE id = ?");
+            $stmt->execute([$action['response_id']]);
+            $response = $stmt->fetch();
             
             if ($response && $response['photos']) {
                 $action['response_photos'] = json_decode($response['photos'], true);
