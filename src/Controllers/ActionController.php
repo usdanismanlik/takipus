@@ -72,13 +72,6 @@ class ActionController
             }
         }
         
-        // Debug: Response'a ekle
-        $debugInfo = [
-            'photos_received' => $data['photos'] ?? 'NOT SET',
-            'photos_type' => isset($data['photos']) ? gettype($data['photos']) : 'NOT SET',
-            'photos_to_save' => $photos,
-        ];
-
         // Manuel aksiyon oluştur
         $actionId = $this->actionModel->create([
             'company_id' => $data['company_id'],
@@ -132,9 +125,6 @@ class ActionController
         if ($action['photos']) {
             $action['photos'] = json_decode($action['photos'], true);
         }
-        
-        // Debug bilgisini ekle
-        $action['_debug'] = $debugInfo;
 
         Response::success($action, 'Manuel aksiyon başarıyla oluşturuldu', 201);
     }
