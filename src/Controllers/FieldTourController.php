@@ -205,6 +205,17 @@ class FieldTourController
         // Response fotoğraflarını aktar
         $photos = $response['photos'] ?? null;
 
+        // Sorumlu kullanıcıyı belirle
+        // 1. Öncelik: data'dan gelen assigned_to_user_id
+        // 2. Alternatif: Question'daki responsible_user_ids'den ilk kullanıcı
+        $assignedToUserId = $data['assigned_to_user_id'] ?? null;
+        if (!$assignedToUserId && !empty($question['responsible_user_ids'])) {
+            $responsibleIds = json_decode($question['responsible_user_ids'], true);
+            if (is_array($responsibleIds) && !empty($responsibleIds)) {
+                $assignedToUserId = $responsibleIds[0];
+            }
+        }
+
         // Aksiyonu oluştur
         $actionId = $this->actionModel->create([
             'company_id' => $tour['company_id'],
@@ -214,7 +225,7 @@ class FieldTourController
             'description' => $description,
             'photos' => $photos,
             'location' => $response['location'] ?? $tour['location'],
-            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
+            'assigned_to_user_id' => $assignedToUserId,
             'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
             'status' => 'open',
             'priority' => $riskInfo['priority'],
