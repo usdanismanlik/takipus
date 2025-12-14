@@ -41,6 +41,11 @@ abstract class Model
         }
     }
 
+    public function getDb(): \PDO
+    {
+        return $this->db;
+    }
+
     public function find(int $id): ?array
     {
         $sql = "SELECT * FROM {$this->table} WHERE id = ?";

@@ -14,12 +14,16 @@ class ActionController
     private Action $actionModel;
     private ActionClosure $closureModel;
     private Notification $notificationModel;
+    private \PDO $db;
 
     public function __construct()
     {
         $this->actionModel = new Action();
         $this->closureModel = new ActionClosure();
         $this->notificationModel = new Notification();
+        
+        // Database bağlantısını al
+        $this->db = $this->actionModel->getDb();
     }
 
     /**
