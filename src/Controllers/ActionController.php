@@ -50,12 +50,24 @@ class ActionController
         $riskSeverity = $data['risk_severity'] ?? 3;
         $riskInfo = RiskMatrix::calculateRisk($riskProbability, $riskSeverity);
 
-        // Termin uyarı günleri
+        // Termin uyarı günlerini JSON olarak kaydet
         $reminderDays = null;
         if (isset($data['due_date_reminder_days']) && is_array($data['due_date_reminder_days'])) {
             $reminderDays = json_encode($data['due_date_reminder_days']);
         } elseif (isset($data['due_date'])) {
             $reminderDays = json_encode([7, 3, 1]);
+        }
+
+        // Fotoğrafları JSON olarak kaydet
+        $photos = null;
+        if (isset($data['photos'])) {
+            if (is_string($data['photos'])) {
+                // JSON string olarak gelirse decode et
+                $photosArray = json_decode($data['photos'], true);
+                $photos = is_array($photosArray) ? json_encode($photosArray) : null;
+            } elseif (is_array($data['photos'])) {
+                $photos = json_encode($data['photos']);
+            }
         }
 
         // Manuel aksiyon oluştur
@@ -65,6 +77,7 @@ class ActionController
             'response_id' => null,
             'title' => $data['title'],
             'description' => $data['description'],
+            'photos' => $photos,
             'location' => $data['location'] ?? null,
             'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
             'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
@@ -163,6 +176,14 @@ class ActionController
         // JSON alanlarını decode et
         if ($action['due_date_reminder_days']) {
             $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
+        }
+
+        // Aksiyon fotoğraflarını decode et
+        if (!empty($action['photos'])) {
+            $photos = json_decode($action['photos'], true);
+            $action['photos'] = is_array($photos) ? $photos : [];
+        } else {
+            $action['photos'] = [];
         }
 
         // Response fotoğraflarını ekle (field tour'dan gelen)

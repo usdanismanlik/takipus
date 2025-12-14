@@ -196,6 +196,9 @@ class FieldTourController
         $riskSeverity = $data['risk_severity'] ?? 3;
         $riskInfo = RiskMatrix::calculateRisk($riskProbability, $riskSeverity);
 
+        // Response fotoğraflarını aktar
+        $photos = $response['photos'] ?? null;
+
         // Aksiyonu oluştur
         $actionId = $this->actionModel->create([
             'company_id' => $tour['company_id'],
@@ -203,6 +206,7 @@ class FieldTourController
             'response_id' => $response['id'],
             'title' => $title,
             'description' => $description,
+            'photos' => $photos,
             'location' => $response['location'] ?? $tour['location'],
             'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
             'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
