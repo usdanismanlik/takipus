@@ -60,15 +60,21 @@ class ActionController
 
         // Fotoğrafları JSON olarak kaydet
         $photos = null;
-        if (isset($data['photos'])) {
+        if (isset($data['photos']) && !empty($data['photos'])) {
             if (is_string($data['photos'])) {
                 // JSON string olarak gelirse decode et
                 $photosArray = json_decode($data['photos'], true);
-                $photos = is_array($photosArray) ? json_encode($photosArray) : null;
-            } elseif (is_array($data['photos'])) {
+                if (is_array($photosArray) && !empty($photosArray)) {
+                    $photos = json_encode($photosArray);
+                }
+            } elseif (is_array($data['photos']) && !empty($data['photos'])) {
                 $photos = json_encode($data['photos']);
             }
         }
+        
+        // Debug log
+        error_log("Photos data received: " . print_r($data['photos'] ?? 'NOT SET', true));
+        error_log("Photos to save: " . ($photos ?? 'NULL'));
 
         // Manuel aksiyon oluştur
         $actionId = $this->actionModel->create([
