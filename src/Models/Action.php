@@ -12,6 +12,7 @@ class Action extends Model
         'response_id',
         'title',
         'description',
+        'photos',
         'location',
         'assigned_to_user_id',
         'assigned_to_department_id',
