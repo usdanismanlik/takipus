@@ -129,8 +129,14 @@ class FieldTourController
 
         // Fotoğrafları JSON olarak kaydet
         $photos = null;
-        if (isset($data['photos']) && is_array($data['photos'])) {
-            $photos = json_encode($data['photos']);
+        if (isset($data['photos'])) {
+            if (is_string($data['photos'])) {
+                // Frontend'den JSON string olarak geliyorsa direkt kullan
+                $photos = $data['photos'];
+            } elseif (is_array($data['photos'])) {
+                // Array olarak geliyorsa encode et
+                $photos = json_encode($data['photos']);
+            }
         }
 
         // Cevabı kaydet
