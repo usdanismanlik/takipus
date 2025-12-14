@@ -8,29 +8,38 @@ use Aws\Exception\AwsException;
 
 class FileUploadController
 {
-    private S3Client $s3Client;
+    private ?S3Client $s3Client = null;
     private string $bucket;
     private string $region;
+    private bool $useS3;
+    private string $localUploadDir;
+    private string $localUploadUrl;
 
     public function __construct()
     {
-        $this->bucket = $_ENV['S3_BUCKET'] ?? 'takipus';
-        $this->region = $_ENV['S3_REGION'] ?? 'us-east-1';
+        $this->useS3 = filter_var($_ENV['USE_S3'] ?? 'true', FILTER_VALIDATE_BOOLEAN);
+        $this->localUploadDir = $_ENV['LOCAL_UPLOAD_DIR'] ?? 'public/uploads';
+        $this->localUploadUrl = $_ENV['LOCAL_UPLOAD_URL'] ?? 'https://takipus-api.apps.misafirus.com/uploads';
         
-        $endpoint = $_ENV['S3_ENDPOINT'] ?? 'https://files-api.apps.misafirus.com';
-        $accessKey = $_ENV['S3_ACCESS_KEY'] ?? '8d2b5f417f60ef4456765766';
-        $secretKey = $_ENV['S3_SECRET_KEY'] ?? 'aabf96bc25a790c3ec944155ab6348fd0840e3';
+        if ($this->useS3) {
+            $this->bucket = $_ENV['S3_BUCKET'] ?? 'takipus';
+            $this->region = $_ENV['S3_REGION'] ?? 'us-east-1';
+            
+            $endpoint = $_ENV['S3_ENDPOINT'] ?? 'https://files-api.apps.misafirus.com';
+            $accessKey = $_ENV['S3_ACCESS_KEY'] ?? '8d2b5f417f60ef4456765766';
+            $secretKey = $_ENV['S3_SECRET_KEY'] ?? 'aabf96bc25a790c3ec944155ab6348fd0840e3';
 
-        $this->s3Client = new S3Client([
-            'version' => 'latest',
-            'region' => $this->region,
-            'endpoint' => $endpoint,
-            'use_path_style_endpoint' => true,
-            'credentials' => [
-                'key' => $accessKey,
-                'secret' => $secretKey,
-            ],
-        ]);
+            $this->s3Client = new S3Client([
+                'version' => 'latest',
+                'region' => $this->region,
+                'endpoint' => $endpoint,
+                'use_path_style_endpoint' => true,
+                'credentials' => [
+                    'key' => $accessKey,
+                    'secret' => $secretKey,
+                ],
+            ]);
+        }
     }
 
     /**
@@ -97,30 +106,64 @@ class FileUploadController
 
             // Benzersiz dosya adı oluştur
             $uniqueFileName = uniqid() . '_' . time() . '.' . $fileExtension;
-            $s3Key = 'uploads/' . date('Y/m/d') . '/' . $uniqueFileName;
+            $relativePath = 'uploads/' . date('Y/m/d') . '/' . $uniqueFileName;
 
             try {
-                // S3'e yükle
-                $result = $this->s3Client->putObject([
-                    'Bucket' => $this->bucket,
-                    'Key' => $s3Key,
-                    'SourceFile' => $fileTmpName,
-                    'ACL' => 'public-read',
-                    'ContentType' => mime_content_type($fileTmpName),
-                ]);
+                if ($this->useS3) {
+                    // S3'e yükle
+                    $result = $this->s3Client->putObject([
+                        'Bucket' => $this->bucket,
+                        'Key' => $relativePath,
+                        'SourceFile' => $fileTmpName,
+                        'ACL' => 'public-read',
+                        'ContentType' => mime_content_type($fileTmpName),
+                    ]);
 
-                $uploadedFiles[] = [
-                    'original_name' => $fileName,
-                    'file_name' => $uniqueFileName,
-                    'url' => $result['ObjectURL'],
-                    'size' => $fileSize,
-                    'type' => $fileExtension,
-                ];
+                    $uploadedFiles[] = [
+                        'original_name' => $fileName,
+                        'file_name' => $uniqueFileName,
+                        'url' => $result['ObjectURL'],
+                        'size' => $fileSize,
+                        'type' => $fileExtension,
+                    ];
+                } else {
+                    // Local'e yükle
+                    $uploadDir = rtrim($this->localUploadDir, '/') . '/' . date('Y/m/d');
+                    
+                    // Klasörü oluştur
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+                    
+                    $localFilePath = $uploadDir . '/' . $uniqueFileName;
+                    
+                    if (move_uploaded_file($fileTmpName, $localFilePath)) {
+                        $fileUrl = rtrim($this->localUploadUrl, '/') . '/' . date('Y/m/d') . '/' . $uniqueFileName;
+                        
+                        $uploadedFiles[] = [
+                            'original_name' => $fileName,
+                            'file_name' => $uniqueFileName,
+                            'url' => $fileUrl,
+                            'size' => $fileSize,
+                            'type' => $fileExtension,
+                        ];
+                    } else {
+                        $errors[] = [
+                            'file' => $fileName,
+                            'error' => 'Dosya yükleme hatası: Dosya taşınamadı'
+                        ];
+                    }
+                }
 
             } catch (AwsException $e) {
                 $errors[] = [
                     'file' => $fileName,
                     'error' => 'S3 yükleme hatası: ' . $e->getMessage()
+                ];
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'file' => $fileName,
+                    'error' => 'Yükleme hatası: ' . $e->getMessage()
                 ];
             }
         }
@@ -151,27 +194,41 @@ class FileUploadController
             return;
         }
 
-        // URL'den S3 key'i çıkar
         $url = $data['url'];
         $parsedUrl = parse_url($url);
         $path = $parsedUrl['path'] ?? '';
-        
-        // Bucket adını path'ten çıkar
-        $pathParts = explode('/', ltrim($path, '/'));
-        if ($pathParts[0] === $this->bucket) {
-            array_shift($pathParts);
-        }
-        $s3Key = implode('/', $pathParts);
 
         try {
-            $this->s3Client->deleteObject([
-                'Bucket' => $this->bucket,
-                'Key' => $s3Key,
-            ]);
+            if ($this->useS3) {
+                // S3'ten sil
+                // Bucket adını path'ten çıkar
+                $pathParts = explode('/', ltrim($path, '/'));
+                if ($pathParts[0] === $this->bucket) {
+                    array_shift($pathParts);
+                }
+                $s3Key = implode('/', $pathParts);
+
+                $this->s3Client->deleteObject([
+                    'Bucket' => $this->bucket,
+                    'Key' => $s3Key,
+                ]);
+            } else {
+                // Local'den sil
+                $localFilePath = $this->localUploadDir . $path;
+                
+                if (file_exists($localFilePath)) {
+                    unlink($localFilePath);
+                } else {
+                    Response::error('Dosya bulunamadı', 404);
+                    return;
+                }
+            }
 
             Response::success(null, 'Dosya başarıyla silindi');
 
         } catch (AwsException $e) {
+            Response::error('S3 dosya silinemedi: ' . $e->getMessage(), 500);
+        } catch (\Exception $e) {
             Response::error('Dosya silinemedi: ' . $e->getMessage(), 500);
         }
     }
