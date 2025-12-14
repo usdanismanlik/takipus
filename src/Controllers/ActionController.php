@@ -61,8 +61,8 @@ class ActionController
         // Manuel aksiyon oluştur
         $actionId = $this->actionModel->create([
             'company_id' => $data['company_id'],
-            'field_tour_id' => 0, // Manuel aksiyonlar için 0
-            'response_id' => 0,
+            'field_tour_id' => null, // Manuel aksiyonlar için null
+            'response_id' => null,
             'title' => $data['title'],
             'description' => $data['description'],
             'location' => $data['location'] ?? null,
