@@ -157,11 +157,23 @@ class ActionController
             $actions = array_values($actions);
         }
 
-        // JSON alanlarını decode et
+        // JSON alanlarını decode et ve closure_id ekle
         foreach ($actions as &$action) {
             if ($action['due_date_reminder_days']) {
                 $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
             }
+            
+            // Photos'u decode et
+            if (!empty($action['photos'])) {
+                $photos = json_decode($action['photos'], true);
+                $action['photos'] = is_array($photos) ? $photos : [];
+            } else {
+                $action['photos'] = [];
+            }
+            
+            // Closure ID'yi ekle
+            $closure = $this->closureModel->getLatestByAction($action['id']);
+            $action['closure_id'] = $closure ? $closure['id'] : null;
         }
 
         Response::success($actions);
