@@ -18,7 +18,14 @@ class FileUploadController
     public function __construct()
     {
         $this->useS3 = filter_var($_ENV['USE_S3'] ?? 'true', FILTER_VALIDATE_BOOLEAN);
-        $this->localUploadDir = $_ENV['LOCAL_UPLOAD_DIR'] ?? 'public/uploads';
+        
+        // Local upload directory - relative path'i absolute'a çevir
+        $localDir = $_ENV['LOCAL_UPLOAD_DIR'] ?? 'public/uploads';
+        if (!str_starts_with($localDir, '/')) {
+            // Relative path ise, project root'a göre absolute yap
+            $localDir = __DIR__ . '/../../' . $localDir;
+        }
+        $this->localUploadDir = $localDir;
         $this->localUploadUrl = $_ENV['LOCAL_UPLOAD_URL'] ?? 'https://takipus-api.apps.misafirus.com/uploads';
         
         if ($this->useS3) {
