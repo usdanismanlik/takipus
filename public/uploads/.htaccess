@@ -1,0 +1,28 @@
+# Allow access to uploaded files
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
+
+# Set proper MIME types
+<IfModule mod_mime.c>
+    AddType image/jpeg .jpg .jpeg
+    AddType image/png .png
+    AddType image/gif .gif
+    AddType application/pdf .pdf
+</IfModule>
+
+# Enable CORS for images
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+# Cache images for 1 year
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType application/pdf "access plus 1 month"
+</IfModule>
