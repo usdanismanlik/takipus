@@ -18,7 +18,7 @@ class FileUploadController
     public function __construct()
     {
         $this->useS3 = filter_var($_ENV['USE_S3'] ?? 'true', FILTER_VALIDATE_BOOLEAN);
-        
+
         // Local upload directory - relative path'i absolute'a çevir
         $localDir = $_ENV['LOCAL_UPLOAD_DIR'] ?? 'uploads';
         if (!str_starts_with($localDir, '/')) {
@@ -29,11 +29,11 @@ class FileUploadController
         }
         $this->localUploadDir = $localDir;
         $this->localUploadUrl = $_ENV['LOCAL_UPLOAD_URL'] ?? 'https://takipus-api.apps.misafirus.com/uploads';
-        
+
         if ($this->useS3) {
             $this->bucket = $_ENV['S3_BUCKET'] ?? 'takipus';
             $this->region = $_ENV['S3_REGION'] ?? 'us-east-1';
-            
+
             $endpoint = $_ENV['S3_ENDPOINT'] ?? 'https://files-api.apps.misafirus.com';
             $accessKey = $_ENV['S3_ACCESS_KEY'] ?? '8d2b5f417f60ef4456765766';
             $secretKey = $_ENV['S3_SECRET_KEY'] ?? 'aabf96bc25a790c3ec944155ab6348fd0840e3';
@@ -57,7 +57,15 @@ class FileUploadController
      */
     public function upload(): void
     {
+        // Debug logging
+        error_log('=== UPLOAD DEBUG ===');
+        error_log('POST: ' . json_encode($_POST));
+        error_log('FILES: ' . json_encode($_FILES));
+        error_log('Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
+        error_log('====================');
+
         if (empty($_FILES['files'])) {
+            error_log('ERROR: No files uploaded');
             Response::error('Dosya seçilmedi', 422);
             return;
         }
@@ -104,7 +112,7 @@ class FileUploadController
             // Dosya uzantısı kontrolü
             $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'];
             $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            
+
             if (!in_array($fileExtension, $allowedExtensions)) {
                 $errors[] = [
                     'file' => $fileName,
@@ -138,17 +146,17 @@ class FileUploadController
                 } else {
                     // Local'e yükle
                     $uploadDir = rtrim($this->localUploadDir, '/') . '/' . date('Y/m/d');
-                    
+
                     // Klasörü oluştur
                     if (!is_dir($uploadDir)) {
                         mkdir($uploadDir, 0755, true);
                     }
-                    
+
                     $localFilePath = $uploadDir . '/' . $uniqueFileName;
-                    
+
                     if (move_uploaded_file($fileTmpName, $localFilePath)) {
                         $fileUrl = rtrim($this->localUploadUrl, '/') . '/' . date('Y/m/d') . '/' . $uniqueFileName;
-                        
+
                         $uploadedFiles[] = [
                             'original_name' => $fileName,
                             'file_name' => $uniqueFileName,
@@ -224,7 +232,7 @@ class FileUploadController
             } else {
                 // Local'den sil
                 $localFilePath = $this->localUploadDir . $path;
-                
+
                 if (file_exists($localFilePath)) {
                     unlink($localFilePath);
                 } else {
