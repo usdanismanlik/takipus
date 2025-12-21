@@ -125,6 +125,13 @@ class FileUploadController
             $uniqueFileName = uniqid() . '_' . time() . '.' . $fileExtension;
             $relativePath = 'uploads/' . date('Y/m/d') . '/' . $uniqueFileName;
 
+            // Görsel dosyaları optimize et
+            $isImage = in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif']);
+            if ($isImage) {
+                $fileTmpName = $this->optimizeImage($fileTmpName, $fileExtension);
+                $fileSize = filesize($fileTmpName); // Yeni boyutu al
+            }
+
             try {
                 if ($this->useS3) {
                     // S3'e yükle
@@ -248,5 +255,91 @@ class FileUploadController
         } catch (\Exception $e) {
             Response::error('Dosya silinemedi: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Görsel optimizasyonu - boyut küçültme ve metadata temizleme
+     */
+    private function optimizeImage(string $filePath, string $extension): string
+    {
+        // HEIC/HEIF için şimdilik optimizasyon yapma (GD desteklemiyor)
+        if (in_array($extension, ['heic', 'heif'])) {
+            return $filePath;
+        }
+
+        $maxWidth = 1920;  // Max genişlik
+        $maxHeight = 1920; // Max yükseklik
+        $quality = 85;     // JPEG kalitesi (0-100)
+
+        // Görseli yükle
+        $image = null;
+        switch ($extension) {
+            case 'jpg':
+            case 'jpeg':
+                $image = @imagecreatefromjpeg($filePath);
+                break;
+            case 'png':
+                $image = @imagecreatefrompng($filePath);
+                break;
+            case 'gif':
+                $image = @imagecreatefromgif($filePath);
+                break;
+        }
+
+        if (!$image) {
+            // Görsel yüklenemezse orijinali döndür
+            return $filePath;
+        }
+
+        // Mevcut boyutları al
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        // Yeniden boyutlandırma gerekli mi?
+        if ($width <= $maxWidth && $height <= $maxHeight) {
+            // Boyut uygun ama yine de metadata temizle ve kaliteyi düşür
+            $outputPath = $filePath . '.optimized.jpg';
+            imagejpeg($image, $outputPath, $quality);
+            imagedestroy($image);
+
+            // Eski dosyayı sil, yenisini yerine koy
+            unlink($filePath);
+            rename($outputPath, $filePath);
+
+            return $filePath;
+        }
+
+        // Aspect ratio'yu koru
+        $ratio = min($maxWidth / $width, $maxHeight / $height);
+        $newWidth = (int) ($width * $ratio);
+        $newHeight = (int) ($height * $ratio);
+
+        // Yeni görsel oluştur
+        $newImage = imagecreatetruecolor($newWidth, $newHeight);
+
+        // PNG için transparency koru
+        if ($extension === 'png') {
+            imagealphablending($newImage, false);
+            imagesavealpha($newImage, true);
+            $transparent = imagecolorallocatealpha($newImage, 255, 255, 255, 127);
+            imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $transparent);
+        }
+
+        // Yeniden boyutlandır
+        imagecopyresampled($newImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+
+        // Kaydet (her zaman JPEG olarak, metadata'sız)
+        $outputPath = $filePath . '.optimized.jpg';
+        imagejpeg($newImage, $outputPath, $quality);
+
+        // Belleği temizle
+        imagedestroy($image);
+        imagedestroy($newImage);
+
+        // Eski dosyayı sil, yenisini yerine koy
+        unlink($filePath);
+        rename($outputPath, $filePath);
+
+        return $filePath;
     }
 }
