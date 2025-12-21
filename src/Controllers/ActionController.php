@@ -405,6 +405,7 @@ class ActionController
 
         // Aksiyon zaten tamamlanmış mı?
         if ($action['status'] === 'completed') {
+            error_log('ERROR: Action already completed');
             Response::error('Aksiyon zaten tamamlanmış', 422);
             return;
         }
@@ -412,6 +413,7 @@ class ActionController
         // Bekleyen kapatma talebi var mı?
         $existingClosure = $this->closureModel->getLatestByAction($id);
         if ($existingClosure && $existingClosure['status'] === 'pending') {
+            error_log('ERROR: Pending closure already exists - ' . json_encode($existingClosure));
             Response::error('Bu aksiyon için bekleyen bir kapatma talebi zaten var', 422);
             return;
         }
