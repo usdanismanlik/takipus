@@ -21,7 +21,7 @@ class ActionController
         $this->actionModel = new Action();
         $this->closureModel = new ActionClosure();
         $this->notificationModel = new Notification();
-        
+
         // Database bağlantısını al
         $this->db = $this->actionModel->getDb();
     }
@@ -71,7 +71,7 @@ class ActionController
                 $photos = json_encode($data['photos']);
             }
         }
-        
+
         // Manuel aksiyon oluştur
         $actionId = $this->actionModel->create([
             'company_id' => $data['company_id'],
@@ -120,7 +120,7 @@ class ActionController
         if ($action['due_date_reminder_days']) {
             $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
         }
-        
+
         // Photos'u decode et
         if ($action['photos']) {
             $action['photos'] = json_decode($action['photos'], true);
@@ -141,7 +141,7 @@ class ActionController
         $isOverdue = $_GET['is_overdue'] ?? null;
 
         if ($userId) {
-            $actions = $this->actionModel->getByAssignedUser((int)$userId, $status);
+            $actions = $this->actionModel->getByAssignedUser((int) $userId, $status);
         } elseif ($companyId) {
             $actions = $this->actionModel->getByCompany($companyId, $status);
         } else {
@@ -151,8 +151,8 @@ class ActionController
 
         // Overdue filtresi
         if ($isOverdue !== null) {
-            $actions = array_filter($actions, function($action) use ($isOverdue) {
-                return $action['is_overdue'] == (int)$isOverdue;
+            $actions = array_filter($actions, function ($action) use ($isOverdue) {
+                return $action['is_overdue'] == (int) $isOverdue;
             });
             $actions = array_values($actions);
         }
@@ -162,7 +162,7 @@ class ActionController
             if ($action['due_date_reminder_days']) {
                 $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
             }
-            
+
             // Photos'u decode et
             if (!empty($action['photos'])) {
                 $photos = json_decode($action['photos'], true);
@@ -170,7 +170,7 @@ class ActionController
             } else {
                 $action['photos'] = [];
             }
-            
+
             // Closure ID'yi ekle
             $closure = $this->closureModel->getLatestByAction($action['id']);
             $action['closure_id'] = $closure ? $closure['id'] : null;
@@ -210,7 +210,7 @@ class ActionController
             $stmt = $this->db->prepare("SELECT photos FROM field_tour_responses WHERE id = ?");
             $stmt->execute([$action['response_id']]);
             $response = $stmt->fetch();
-            
+
             if ($response && !empty($response['photos'])) {
                 $photos = json_decode($response['photos'], true);
                 $action['response_photos'] = is_array($photos) ? $photos : [];
@@ -226,16 +226,16 @@ class ActionController
         if ($closure) {
             $action['closure_id'] = $closure['id'];
             $action['closure_notes'] = $closure['closure_description'];
-            
+
             if (!empty($closure['evidence_files'])) {
                 $photos = json_decode($closure['evidence_files'], true);
                 $action['closure_photos'] = is_array($photos) ? $photos : [];
             } else {
                 $action['closure_photos'] = [];
             }
-            
-            $action['approval_notes'] = $closure['approval_notes'];
-            $action['rejection_notes'] = $closure['rejection_notes'];
+
+            $action['approval_notes'] = $closure['approval_notes'] ?? null;
+            $action['rejection_notes'] = $closure['rejection_notes'] ?? null;
         } else {
             $action['closure_photos'] = [];
             $action['closure_notes'] = null;
@@ -263,20 +263,28 @@ class ActionController
         $updateData = [];
         $oldStatus = $action['status'];
 
-        if (isset($data['title'])) $updateData['title'] = $data['title'];
-        if (isset($data['description'])) $updateData['description'] = $data['description'];
-        if (isset($data['location'])) $updateData['location'] = $data['location'];
-        if (isset($data['assigned_to_user_id'])) $updateData['assigned_to_user_id'] = $data['assigned_to_user_id'];
-        if (isset($data['assigned_to_department_id'])) $updateData['assigned_to_department_id'] = $data['assigned_to_department_id'];
-        if (isset($data['priority'])) $updateData['priority'] = $data['priority'];
-        if (isset($data['risk_score'])) $updateData['risk_score'] = $data['risk_score'];
-        if (isset($data['status'])) $updateData['status'] = $data['status'];
-        
+        if (isset($data['title']))
+            $updateData['title'] = $data['title'];
+        if (isset($data['description']))
+            $updateData['description'] = $data['description'];
+        if (isset($data['location']))
+            $updateData['location'] = $data['location'];
+        if (isset($data['assigned_to_user_id']))
+            $updateData['assigned_to_user_id'] = $data['assigned_to_user_id'];
+        if (isset($data['assigned_to_department_id']))
+            $updateData['assigned_to_department_id'] = $data['assigned_to_department_id'];
+        if (isset($data['priority']))
+            $updateData['priority'] = $data['priority'];
+        if (isset($data['risk_score']))
+            $updateData['risk_score'] = $data['risk_score'];
+        if (isset($data['status']))
+            $updateData['status'] = $data['status'];
+
         // Due date ve reminder days güncelleme
         if (isset($data['due_date'])) {
             $updateData['due_date'] = $data['due_date'];
         }
-        
+
         if (isset($data['due_date_reminder_days']) && is_array($data['due_date_reminder_days'])) {
             $updateData['due_date_reminder_days'] = json_encode($data['due_date_reminder_days']);
         }
@@ -284,9 +292,9 @@ class ActionController
         if (!empty($updateData)) {
             // Audit log için eski değerleri kaydet
             $oldValues = $action;
-            
+
             $this->actionModel->update($id, $updateData);
-            
+
             // Audit log
             $newValues = $this->actionModel->find($id);
             AuditLogger::logUpdate(
@@ -310,7 +318,7 @@ class ActionController
         }
 
         $updated = $this->actionModel->find($id);
-        
+
         // JSON alanlarını decode et
         if ($updated['due_date_reminder_days']) {
             $updated['due_date_reminder_days'] = json_decode($updated['due_date_reminder_days'], true);
@@ -338,12 +346,12 @@ class ActionController
         }
 
         $oldValues = $action;
-        
+
         $this->actionModel->update($id, [
             'status' => 'completed',
             'completed_at' => date('Y-m-d H:i:s'),
         ]);
-        
+
         // Audit log
         $newValues = $this->actionModel->find($id);
         AuditLogger::logUpdate(
