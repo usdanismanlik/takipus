@@ -378,6 +378,12 @@ class ActionController
     {
         $data = json_decode(file_get_contents('php://input'), true);
 
+        // Debug logging
+        error_log('=== CLOSURE REQUEST DEBUG ===');
+        error_log('Action ID: ' . $id);
+        error_log('Request data: ' . json_encode($data));
+        error_log('=============================');
+
         $action = $this->actionModel->find($id);
         if (!$action) {
             Response::error('Aksiyon bulunamadı', 404);
@@ -386,11 +392,13 @@ class ActionController
 
         // Validasyon
         if (!isset($data['closure_description'])) {
+            error_log('ERROR: closure_description missing');
             Response::error('closure_description alanı zorunludur', 422);
             return;
         }
 
         if (!isset($data['requested_by'])) {
+            error_log('ERROR: requested_by missing');
             Response::error('requested_by alanı zorunludur', 422);
             return;
         }
