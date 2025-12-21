@@ -110,7 +110,7 @@ class FileUploadController
             }
 
             // Dosya uzantısı kontrolü
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'];
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'];
             $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
             if (!in_array($fileExtension, $allowedExtensions)) {
