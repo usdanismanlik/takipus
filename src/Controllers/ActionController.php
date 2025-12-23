@@ -171,6 +171,34 @@ class ActionController
                 $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
             }
 
+            // Tüm aksiyonlar için closure bilgisini ekle
+            // Pending approval durumundaysa, closure detaylarını ekle
+            if ($action['status'] === 'pending_approval') {
+                $closureStmt = $this->db->prepare("
+                    SELECT id, status, reviewed_by, upper_approved_by, requires_upper_approval
+                    FROM action_closures 
+                    WHERE action_id = ? 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ");
+                $closureStmt->execute([$action['id']]);
+                $closure = $closureStmt->fetch();
+
+                if ($closure) {
+                    $action['closure_id'] = $closure['id'];
+                    $action['closure_status'] = $closure['status'];
+                    $action['closure_requires_upper'] = $closure['requires_upper_approval'];
+                    $action['closure_reviewed_by'] = $closure['reviewed_by'];
+                    $action['closure_upper_approved_by'] = $closure['upper_approved_by'];
+                } else {
+                    $action['closure_id'] = null;
+                    $action['closure_status'] = null;
+                }
+            } else {
+                $action['closure_id'] = null;
+                $action['closure_status'] = null;
+            }
+
             // Photos'u decode et
             if (!empty($action['photos'])) {
                 $photos = json_decode($action['photos'], true);
@@ -178,10 +206,6 @@ class ActionController
             } else {
                 $action['photos'] = [];
             }
-
-            // Closure ID'yi ekle
-            $closure = $this->closureModel->getLatestByAction($action['id']);
-            $action['closure_id'] = $closure ? $closure['id'] : null;
         }
 
         Response::success($actions);
