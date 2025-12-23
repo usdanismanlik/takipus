@@ -33,7 +33,13 @@ class ActionController
      */
     public function createManual(): void
     {
-        $data = json_decode(file_get_contents('php://input'), true);
+        // FormData veya JSON destekle
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        if (strpos($contentType, 'multipart/form-data') !== false || strpos($contentType, 'application/x-www-form-urlencoded') !== false) {
+            $data = $_POST;
+        } else {
+            $data = json_decode(file_get_contents('php://input'), true);
+        }
 
         // Validasyon
         if (!isset($data['company_id']) || !isset($data['title']) || !isset($data['description'])) {
