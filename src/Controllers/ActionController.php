@@ -8,6 +8,7 @@ use Src\Models\Notification;
 use Src\Helpers\Response;
 use Src\Helpers\AuditLogger;
 use Src\Helpers\RiskMatrix;
+use Src\Services\CoreService;
 
 class ActionController
 {
@@ -282,7 +283,7 @@ class ActionController
 
         // Due date ve reminder days güncelleme
         if (isset($data['due_date'])) {
-            $updateData['due_date'] = $data['due_date'];
+            $updateData['due_date'] = !empty($data['due_date']) ? $data['due_date'] : null;
         }
 
         if (isset($data['due_date_reminder_days']) && is_array($data['due_date_reminder_days'])) {
@@ -659,6 +660,14 @@ class ActionController
                 'related_type' => 'action',
                 'related_id' => $action['id'],
             ]);
+
+            // Core Service Trigger
+            CoreService::sendPushNotification(
+                (int) $action['assigned_to_user_id'],
+                'Aksiyon Durumu Değişti',
+                "'{$action['title']}' durumu '{$statusLabels[$newStatus]}' oldu.",
+                ['action_id' => $action['id'], 'type' => 'action_status_changed']
+            );
         }
     }
 
@@ -675,6 +684,14 @@ class ActionController
             'related_type' => 'action',
             'related_id' => $action['id'],
         ]);
+
+        // Core Service Trigger
+        CoreService::sendPushNotification(
+            $newUserId,
+            'Yeni Aksiyon Atandı',
+            "Size yeni bir aksiyon atandı: {$action['title']}",
+            ['action_id' => $action['id'], 'type' => 'action_assigned']
+        );
     }
 
     /**
@@ -692,6 +709,14 @@ class ActionController
                 'related_type' => 'action',
                 'related_id' => $action['id'],
             ]);
+
+            // Core Service Trigger
+            CoreService::sendPushNotification(
+                (int) $action['created_by'],
+                'Aksiyon Tamamlandı',
+                "'{$action['title']}' aksiyonu tamamlandı.",
+                ['action_id' => $action['id'], 'type' => 'action_completed']
+            );
         }
     }
 }
