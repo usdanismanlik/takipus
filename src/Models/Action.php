@@ -10,12 +10,14 @@ class Action extends Model
         'company_id',
         'field_tour_id',
         'response_id',
+        'checklist_id',
         'title',
         'description',
         'photos',
         'location',
         'assigned_to_user_id',
         'assigned_to_department_id',
+        'upper_approver_id',
         'status',
         'priority',
         'risk_score',
@@ -73,7 +75,7 @@ class Action extends Model
                 AND status NOT IN ('completed', 'cancelled')
                 AND is_overdue = 0
                 ORDER BY due_date ASC";
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -86,7 +88,7 @@ class Action extends Model
                 AND status NOT IN ('completed', 'cancelled')
                 AND due_date_reminder_days IS NOT NULL
                 ORDER BY due_date ASC";
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
