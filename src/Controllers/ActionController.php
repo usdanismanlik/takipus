@@ -84,6 +84,7 @@ class ActionController
             'location' => $data['location'] ?? null,
             'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
             'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
+            'upper_approver_id' => $data['upper_approver_id'] ?? null, // Üst amir onayı için
             'status' => 'open',
             'priority' => $riskInfo['priority'],
             'risk_score' => $riskInfo['score'],
@@ -419,6 +420,17 @@ class ActionController
             return;
         }
 
+        // İkinci onayı verecek kişiyi belirle
+        $requiresSecondApproval = 0;
+        $secondApproverId = $this->getSecondApproverId($action);
+
+        if ($secondApproverId && $secondApproverId > 0) {
+            $requiresSecondApproval = 1;
+            error_log('Second approval required, approver ID: ' . $secondApproverId);
+        } else {
+            error_log('No second approval required');
+        }
+
         // Kanıt dosyalarını JSON olarak kaydet
         $evidenceFiles = null;
         if (isset($data['evidence_files']) && !empty($data['evidence_files'])) {
@@ -439,15 +451,15 @@ class ActionController
             'requested_by' => $data['requested_by'],
             'closure_description' => $data['closure_description'],
             'evidence_files' => $evidenceFiles,
-            'requires_upper_approval' => $data['requires_upper_approval'] ?? 0,
+            'requires_upper_approval' => $requiresSecondApproval,
             'status' => 'pending',
         ]);
 
         // Aksiyonun durumunu 'pending_approval' yap
         $this->actionModel->update($id, ['status' => 'pending_approval']);
 
-        // TODO: Bildirimleri gönder (NotificationService implement edilecek)
-        // $this->sendClosureRequestNotifications($action, $closureId);
+        // Aksiyonu oluşturan kişiye bildirim gönder
+        $this->sendClosureRequestToCreator($action, $closureId);
 
         // Audit log
         $closure = $this->closureModel->find($closureId);
@@ -480,66 +492,83 @@ class ActionController
             return;
         }
 
-        if ($closure['status'] !== 'pending') {
-            Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
-            return;
-        }
-
         if (!isset($data['reviewed_by'])) {
             Response::error('reviewed_by alanı zorunludur', 422);
             return;
         }
 
-        $isUpperApproval = $data['is_upper_approval'] ?? false;
+        $action = $this->actionModel->find($id);
+        $reviewedBy = $data['reviewed_by'];
 
-        if ($isUpperApproval) {
-            // Üst amir onayı
+        // İlk onay mı, ikinci onay mı?
+        if ($closure['status'] === 'pending') {
+            // İlk onay - Creator tarafından yapılmalı
+            if ($reviewedBy != $action['created_by']) {
+                Response::error('İlk onay sadece aksiyonu oluşturan kişi tarafından yapılabilir', 403);
+                return;
+            }
+
+            if ($closure['requires_upper_approval'] == 1) {
+                // İkinci onay gerekli
+                $this->closureModel->update($closureId, [
+                    'reviewed_by' => $reviewedBy,
+                    'review_notes' => $data['review_notes'] ?? null,
+                    'reviewed_at' => date('Y-m-d H:i:s'),
+                    'status' => 'first_approved',
+                ]);
+
+                // İkinci onayı verecek kişiye bildirim gönder
+                $this->sendSecondApprovalRequest($action, $closureId);
+
+                $message = 'İlk onay tamamlandı. İkinci onay bekleniyor.';
+            } else {
+                // İkinci onay gerekmez, direkt tamamla
+                $this->closureModel->update($closureId, [
+                    'reviewed_by' => $reviewedBy,
+                    'review_notes' => $data['review_notes'] ?? null,
+                    'reviewed_at' => date('Y-m-d H:i:s'),
+                    'status' => 'approved',
+                ]);
+
+                // Aksiyonu tamamla
+                $this->actionModel->update($id, [
+                    'status' => 'completed',
+                    'completed_at' => date('Y-m-d H:i:s'),
+                ]);
+
+                $message = 'Kapatma talebi onaylandı ve aksiyon tamamlandı.';
+            }
+
+        } else if ($closure['status'] === 'first_approved') {
+            // İkinci onay - Yetkili kişi tarafından yapılmalı
+            $secondApproverId = $this->getSecondApproverId($action);
+
+            if (!$secondApproverId || $reviewedBy != $secondApproverId) {
+                Response::error('İkinci onay sadece yetkili kişi tarafından yapılabilir', 403);
+                return;
+            }
+
             $this->closureModel->update($closureId, [
-                'upper_approved_by' => $data['reviewed_by'],
+                'upper_approved_by' => $reviewedBy,
                 'upper_review_notes' => $data['review_notes'] ?? null,
                 'upper_reviewed_at' => date('Y-m-d H:i:s'),
                 'status' => 'approved',
             ]);
-        } else {
-            // Normal onay
-            $updateData = [
-                'reviewed_by' => $data['reviewed_by'],
-                'review_notes' => $data['review_notes'] ?? null,
-                'reviewed_at' => date('Y-m-d H:i:s'),
-            ];
 
-            // Üst amir onayı gerekli mi?
-            if ($closure['requires_upper_approval']) {
-                // Henüz tamamlanmadı, üst amir onayı bekliyor
-                $updateData['status'] = 'pending';
-            } else {
-                // Onaylanmış, aksiyon tamamlanabilir
-                $updateData['status'] = 'approved';
-            }
-
-            $this->closureModel->update($closureId, $updateData);
-        }
-
-        $updatedClosure = $this->closureModel->find($closureId);
-
-        // Eğer tam onay aldıysa aksiyonu tamamla
-        if ($updatedClosure['status'] === 'approved') {
+            // Aksiyonu tamamla
             $this->actionModel->update($id, [
                 'status' => 'completed',
                 'completed_at' => date('Y-m-d H:i:s'),
             ]);
 
-            // Tamamlama bildirimi
-            // TODO: Bildirim servisi implement edilecek
-            // $action = $this->actionModel->find($id);
-            // $this->sendClosureApprovedNotifications($action, $updatedClosure);
-        } elseif ($closure['requires_upper_approval'] && !$isUpperApproval) {
-            // Üst amir onayı için bildirim gönder
-            // TODO: Bildirim servisi implement edilecek
-            // $this->sendUpperApprovalRequestNotification($id, $closureId);
+            $message = 'İkinci onay tamamlandı ve aksiyon kapandı.';
+        } else {
+            Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
+            return;
         }
 
         // Audit log
+        $updatedClosure = $this->closureModel->find($closureId);
         AuditLogger::logUpdate(
             '/api/v1/actions/' . $id . '/closure/' . $closureId . '/approve',
             'action_closure',
@@ -553,7 +582,7 @@ class ActionController
             $updatedClosure['evidence_files'] = json_decode($updatedClosure['evidence_files'], true);
         }
 
-        Response::success($updatedClosure, 'Kapatma talebi onaylandı');
+        Response::success($updatedClosure, $message);
     }
 
     /**
@@ -718,5 +747,91 @@ class ActionController
                 ['action_id' => $action['id'], 'type' => 'action_completed']
             );
         }
+    }
+
+    /**
+     * İkinci onayı verecek kişiyi belirler
+     * Field tour aksiyonlarında checklist responsible
+     * Manuel aksiyonlarda upper_approver_id
+     */
+    private function getSecondApproverId(array $action): ?int
+    {
+        // Field tour aksiyonu mu?
+        if ($action['field_tour_id']) {
+            $stmt = $this->db->prepare("
+                SELECT c.general_responsible_id 
+                FROM field_tours ft
+                JOIN checklists c ON ft.checklist_id = c.id
+                WHERE ft.id = ?
+            ");
+            $stmt->execute([$action['field_tour_id']]);
+            $result = $stmt->fetch();
+
+            if ($result && $result['general_responsible_id'] > 0) {
+                return (int) $result['general_responsible_id'];
+            }
+            return null;
+        }
+
+        // Manuel aksiyon - upper_approver_id kullan
+        if (isset($action['upper_approver_id']) && $action['upper_approver_id'] > 0) {
+            return (int) $action['upper_approver_id'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Kapatma talebini aksiyonu oluşturana bildirir
+     */
+    private function sendClosureRequestToCreator(array $action, int $closureId): void
+    {
+        if (!$action['created_by']) {
+            return;
+        }
+
+        $this->notificationModel->create([
+            'user_id' => $action['created_by'],
+            'type' => 'action_status_changed',
+            'title' => 'Kapatma Talebi Onayınızı Bekliyor',
+            'message' => "'{$action['title']}' aksiyonu için kapatma talebi gönderildi. Lütfen onaylayın.",
+            'related_type' => 'action',
+            'related_id' => $action['id'],
+        ]);
+
+        CoreService::sendPushNotification(
+            (int) $action['created_by'],
+            'Kapatma Talebi',
+            "'{$action['title']}' için kapatma talebi onayınızı bekliyor",
+            ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_pending']
+        );
+    }
+
+    /**
+     * İkinci onay gerektiğinde yetkili kişiye bildirim gönderir
+     */
+    private function sendSecondApprovalRequest(array $action, int $closureId): void
+    {
+        $secondApproverId = $this->getSecondApproverId($action);
+
+        if (!$secondApproverId) {
+            return;
+        }
+
+        $this->notificationModel->create([
+            'user_id' => $secondApproverId,
+            'type' => 'action_status_changed',
+            'title' => 'İkinci Onay Gerekli',
+            'message' => "'{$action['title']}' aksiyonu için kapatma talebi ikinci onayınızı bekliyor.",
+            'related_type' => 'action',
+            'related_id' => $action['id'],
+        ]);
+
+        CoreService::sendPushNotification(
+            $secondApproverId,
+            'İkinci Onay Gerekli',
+            "'{$action['title']}' kapatma talebi onayınızı bekliyor",
+            ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_second_approval']
+        );
     }
 }
