@@ -53,7 +53,7 @@ class ActionController
                 ],
                 [
                     'name' => 'description',
-                    'label' => 'Açıklama',
+                    'label' => 'Açıklama11',
                     'type' => 'textarea',
                     'required' => true,
                 ],
