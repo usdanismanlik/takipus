@@ -671,8 +671,11 @@ class ActionController
                 return;
             }
 
-            if ($closure['requires_upper_approval'] == 1) {
-                // İkinci onay gerekli
+            // Upper approver var mı kontrol et
+            $hasUpperApprover = !empty($action['upper_approver_id']);
+
+            if ($hasUpperApprover) {
+                // İkinci onay gerekli - pending_approval durumuna al
                 $this->closureModel->update($closureId, [
                     'reviewed_by' => $reviewedBy,
                     'review_notes' => $data['review_notes'] ?? null,
@@ -680,10 +683,15 @@ class ActionController
                     'status' => 'first_approved',
                 ]);
 
-                // İkinci onayı verecek kişiye bildirim gönder
-                $this->sendSecondApprovalRequest($action, $closureId);
+                // Aksiyonu pending_approval durumuna al
+                $this->actionModel->update($id, [
+                    'status' => 'pending_approval',
+                ]);
 
-                $message = 'İlk onay tamamlandı. İkinci onay bekleniyor.';
+                // Üst yöneticiye bildirim gönder
+                $this->sendUpperApprovalRequest($action, $closureId);
+
+                $message = 'İlk onay tamamlandı. Üst yönetici onayı bekleniyor.';
             } else {
                 // İkinci onay gerekmez, direkt tamamla
                 $this->closureModel->update($closureId, [
@@ -699,15 +707,16 @@ class ActionController
                     'completed_at' => date('Y-m-d H:i:s'),
                 ]);
 
+                // Atanan kullanıcıya bildirim gönder
+                $this->sendClosureCompletedNotification($action);
+
                 $message = 'Kapatma talebi onaylandı ve aksiyon tamamlandı.';
             }
 
         } else if ($closure['status'] === 'first_approved') {
-            // İkinci onay - Yetkili kişi tarafından yapılmalı
-            $secondApproverId = $this->getSecondApproverId($action);
-
-            if (!$secondApproverId || $reviewedBy != $secondApproverId) {
-                Response::error('İkinci onay sadece yetkili kişi tarafından yapılabilir', 403);
+            // İkinci onay - Upper approver tarafından yapılmalı
+            if (empty($action['upper_approver_id']) || $reviewedBy != $action['upper_approver_id']) {
+                Response::error('İkinci onay sadece üst yönetici tarafından yapılabilir', 403);
                 return;
             }
 
@@ -724,7 +733,10 @@ class ActionController
                 'completed_at' => date('Y-m-d H:i:s'),
             ]);
 
-            $message = 'İkinci onay tamamlandı ve aksiyon kapandı.';
+            // Atanan kullanıcı ve oluşturana bildirim gönder
+            $this->sendClosureCompletedNotification($action);
+
+            $message = 'Üst yönetici onayı tamamlandı ve aksiyon kapandı.';
         } else {
             Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
             return;
@@ -762,31 +774,63 @@ class ActionController
             return;
         }
 
-        if ($closure['status'] !== 'pending') {
-            Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
-            return;
-        }
-
         if (!isset($data['reviewed_by']) || !isset($data['review_notes'])) {
             Response::error('reviewed_by ve review_notes alanları zorunludur', 422);
             return;
         }
 
-        // Reddet
-        $this->closureModel->update($closureId, [
-            'reviewed_by' => $data['reviewed_by'],
-            'review_notes' => $data['review_notes'],
-            'reviewed_at' => date('Y-m-d H:i:s'),
-            'status' => 'rejected',
-        ]);
+        $action = $this->actionModel->find($id);
+        $reviewedBy = $data['reviewed_by'];
 
-        // Aksiyonun durumunu geri al
-        $this->actionModel->update($id, ['status' => 'in_progress']);
+        // Hangi seviyede red ediliyor?
+        if ($closure['status'] === 'pending') {
+            // İlk seviye red - Creator tarafından
+            if ($reviewedBy != $action['created_by']) {
+                Response::error('İlk red sadece aksiyonu oluşturan kişi tarafından yapılabilir', 403);
+                return;
+            }
 
-        // Reddedilme bildirimi
-        // TODO: Bildirim servisi implement edilecek
-        // $action = $this->actionModel->find($id);
-        // $this->sendClosureRejectedNotifications($action, $closure, $data['review_notes']);
+            $this->closureModel->update($closureId, [
+                'reviewed_by' => $reviewedBy,
+                'review_notes' => $data['review_notes'],
+                'reviewed_at' => date('Y-m-d H:i:s'),
+                'status' => 'rejected',
+            ]);
+
+            // Aksiyonu open durumuna al
+            $this->actionModel->update($id, ['status' => 'open']);
+
+            // Atanan kullanıcıya bildirim gönder
+            $this->sendClosureRejectedNotification($action, $data['review_notes'], 'creator');
+
+            $message = 'Kapatma talebi reddedildi';
+
+        } else if ($closure['status'] === 'first_approved') {
+            // İkinci seviye red - Upper approver tarafından
+            if (empty($action['upper_approver_id']) || $reviewedBy != $action['upper_approver_id']) {
+                Response::error('İkinci red sadece üst yönetici tarafından yapılabilir', 403);
+                return;
+            }
+
+            $this->closureModel->update($closureId, [
+                'upper_approved_by' => $reviewedBy,
+                'upper_review_notes' => $data['review_notes'],
+                'upper_reviewed_at' => date('Y-m-d H:i:s'),
+                'status' => 'rejected',
+            ]);
+
+            // Aksiyonu open durumuna al
+            $this->actionModel->update($id, ['status' => 'open']);
+
+            // Atanan kullanıcıya bildirim gönder
+            $this->sendClosureRejectedNotification($action, $data['review_notes'], 'upper_approver');
+
+            $message = 'Üst yönetici kapatma talebini reddetti';
+
+        } else {
+            Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
+            return;
+        }
 
         // Audit log
         $updatedClosure = $this->closureModel->find($closureId);
@@ -803,7 +847,7 @@ class ActionController
             $updatedClosure['evidence_files'] = json_decode($updatedClosure['evidence_files'], true);
         }
 
-        Response::success($updatedClosure, 'Kapatma talebi reddedildi');
+        Response::success($updatedClosure, $message);
     }
 
     /**
@@ -995,6 +1039,100 @@ class ActionController
             'İkinci Onay Gerekli',
             "'{$action['title']}' kapatma talebi onayınızı bekliyor",
             ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_second_approval']
+        );
+    }
+
+    /**
+     * Üst yöneticiye onay talebi gönderir
+     */
+    private function sendUpperApprovalRequest(array $action, int $closureId): void
+    {
+        if (empty($action['upper_approver_id'])) {
+            return;
+        }
+
+        $this->notificationModel->create([
+            'user_id' => $action['upper_approver_id'],
+            'title' => 'Üst Yönetici Onayı Gerekli',
+            'message' => "'{$action['title']}' aksiyonu için kapatma talebi onayınızı bekliyor",
+            'type' => 'closure_upper_approval',
+            'data' => json_encode(['action_id' => $action['id'], 'closure_id' => $closureId]),
+        ]);
+
+        CoreService::sendPushNotification(
+            $action['upper_approver_id'],
+            'Üst Yönetici Onayı Gerekli',
+            "'{$action['title']}' kapatma talebi onayınızı bekliyor",
+            ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_upper_approval']
+        );
+    }
+
+    /**
+     * Aksiyon kapatıldığında ilgili kişilere bildirim gönderir
+     */
+    private function sendClosureCompletedNotification(array $action): void
+    {
+        // Atanan kullanıcıya bildirim
+        if (!empty($action['assigned_to_user_id'])) {
+            $this->notificationModel->create([
+                'user_id' => $action['assigned_to_user_id'],
+                'title' => 'Aksiyon Kapatıldı',
+                'message' => "'{$action['title']}' aksiyonu kapatıldı",
+                'type' => 'action_completed',
+                'data' => json_encode(['action_id' => $action['id']]),
+            ]);
+
+            CoreService::sendPushNotification(
+                $action['assigned_to_user_id'],
+                'Aksiyon Kapatıldı',
+                "'{$action['title']}' aksiyonu kapatıldı",
+                ['action_id' => $action['id'], 'type' => 'action_completed']
+            );
+        }
+
+        // Oluşturana da bildirim (eğer farklıysa)
+        if (!empty($action['created_by']) && $action['created_by'] != $action['assigned_to_user_id']) {
+            $this->notificationModel->create([
+                'user_id' => $action['created_by'],
+                'title' => 'Aksiyon Kapatıldı',
+                'message' => "'{$action['title']}' aksiyonu kapatıldı",
+                'type' => 'action_completed',
+                'data' => json_encode(['action_id' => $action['id']]),
+            ]);
+
+            CoreService::sendPushNotification(
+                $action['created_by'],
+                'Aksiyon Kapatıldı',
+                "'{$action['title']}' aksiyonu kapatıldı",
+                ['action_id' => $action['id'], 'type' => 'action_completed']
+            );
+        }
+    }
+
+    /**
+     * Kapatma talebi reddedildiğinde bildirim gönderir
+     */
+    private function sendClosureRejectedNotification(array $action, string $notes, string $rejectedBy): void
+    {
+        if (empty($action['assigned_to_user_id'])) {
+            return;
+        }
+
+        $rejectorTitle = $rejectedBy === 'creator' ? 'Oluşturan' : 'Üst Yönetici';
+
+        $this->notificationModel->create([
+            'user_id' => $action['assigned_to_user_id'],
+            'title' => 'Kapatma Talebi Reddedildi',
+            'message' => "{$rejectorTitle} '{$action['title']}' kapatma talebini reddetti: {$notes}",
+            'type' => 'closure_rejected',
+            'data' => json_encode(['action_id' => $action['id']]),
+        ]);
+
+        CoreService::sendPushNotification(
+            $action['assigned_to_user_id'],
+            'Kapatma Talebi Reddedildi',
+            "{$rejectorTitle} kapatma talebini reddetti",
+            ['action_id' => $action['id'], 'type' => 'closure_rejected']
         );
     }
 }
