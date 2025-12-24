@@ -70,18 +70,6 @@ class ActionController
                     'required' => true,
                 ],
                 [
-                    'name' => 'priority',
-                    'label' => 'Öncelik',
-                    'type' => 'select',
-                    'default' => 'medium',
-                    'options' => [
-                        ['label' => 'Düşük', 'value' => 'low'],
-                        ['label' => 'Orta', 'value' => 'medium'],
-                        ['label' => 'Yüksek', 'value' => 'high'],
-                        ['label' => 'Kritik', 'value' => 'critical']
-                    ]
-                ],
-                [
                     'name' => 'source_type',
                     'label' => 'Kaynak Tipi',
                     'type' => 'select',
