@@ -451,6 +451,21 @@ class ActionController
             $updateData['due_date_reminder_days'] = json_encode($data['due_date_reminder_days']);
         }
 
+        // Risk fields güncelleme
+        if (isset($data['risk_probability']) || isset($data['risk_severity'])) {
+            $riskProbability = $data['risk_probability'] ?? $action['risk_probability'] ?? 3;
+            $riskSeverity = $data['risk_severity'] ?? $action['risk_severity'] ?? 3;
+
+            // Risk matrix hesapla
+            $riskInfo = RiskMatrix::calculateRisk($riskProbability, $riskSeverity);
+
+            $updateData['risk_probability'] = $riskProbability;
+            $updateData['risk_severity'] = $riskSeverity;
+            $updateData['risk_score'] = $riskInfo['score'];
+            $updateData['risk_level'] = $riskInfo['level'];
+            $updateData['priority'] = $riskInfo['priority'];
+        }
+
         if (!empty($updateData)) {
             // Audit log için eski değerleri kaydet
             $oldValues = $action;
