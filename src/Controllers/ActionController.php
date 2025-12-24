@@ -131,7 +131,7 @@ class ActionController
                     'default' => false,
                 ],
                 [
-                    'name' => 'supervisor_approver_id',
+                    'name' => 'upper_approver_id',
                     'label' => 'Üst Yönetici',
                     'type' => 'select',
                     'dependsOn' => 'requires_supervisor_approval',
