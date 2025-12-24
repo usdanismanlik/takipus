@@ -64,6 +64,7 @@ $router->put('/api/v1/free-nonconformities/:id', 'FreeNonConformityController@up
 $router->delete('/api/v1/free-nonconformities/:id', 'FreeNonConformityController@destroy');
 
 // Action Endpoints
+$router->get('/api/v1/actions/form-config', 'ActionController@getFormConfig');
 $router->post('/api/v1/actions/manual', 'ActionController@createManual');
 $router->get('/api/v1/actions', 'ActionController@index');
 $router->get('/api/v1/actions/:id', 'ActionController@show');

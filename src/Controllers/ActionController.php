@@ -28,6 +28,136 @@ class ActionController
     }
 
     /**
+     * GET /api/v1/actions/form-config?company_id=XXX
+     * Form yapılandırması - Mobil uygulama için dinamik form
+     */
+    public function getFormConfig(): void
+    {
+        // Company ID zorunlu
+        $companyId = $_GET['company_id'] ?? null;
+        if (!$companyId) {
+            Response::error('company_id parametresi zorunludur', 422);
+            return;
+        }
+
+        // Firmaya göre özelleştirilebilir config
+        // Şimdilik sabit, gelecekte DB'den çekilebilir
+        $config = [
+            'company_id' => $companyId,
+            'fields' => [
+                [
+                    'name' => 'title',
+                    'label' => 'Başlık',
+                    'type' => 'text',
+                    'required' => true,
+                ],
+                [
+                    'name' => 'description',
+                    'label' => 'Açıklama',
+                    'type' => 'textarea',
+                    'required' => true,
+                ],
+                [
+                    'name' => 'location',
+                    'label' => 'Lokasyon',
+                    'type' => 'text',
+                    'required' => true,
+                ],
+                [
+                    'name' => 'due_date',
+                    'label' => 'Termin Tarihi',
+                    'type' => 'date',
+                    'required' => true,
+                ],
+                [
+                    'name' => 'priority',
+                    'label' => 'Öncelik',
+                    'type' => 'select',
+                    'default' => 'medium',
+                    'options' => [
+                        ['label' => 'Düşük', 'value' => 'low'],
+                        ['label' => 'Orta', 'value' => 'medium'],
+                        ['label' => 'Yüksek', 'value' => 'high'],
+                        ['label' => 'Kritik', 'value' => 'critical']
+                    ]
+                ],
+                [
+                    'name' => 'source_type',
+                    'label' => 'Kaynak Tipi',
+                    'type' => 'select',
+                    'default' => 'manual',
+                    'options' => [
+                        ['label' => 'Manuel', 'value' => 'manual'],
+                        ['label' => 'Saha Turu', 'value' => 'field_tour'],
+                        ['label' => 'Periodik Denetim', 'value' => 'periodic_inspection'],
+                        ['label' => '3. Taraf Denetim', 'value' => 'third_party_audit']
+                    ]
+                ],
+                [
+                    'name' => 'assigned_to_user_id',
+                    'label' => 'Atanan Kişi',
+                    'type' => 'select',
+                    'required' => true,
+                    'optionsEndpoint' => 'http://central-auth-and-notification-app.apps.misafirus.com/users/company/{companyId}',
+                    'optionsLabelKey' => 'name',
+                    'optionsValueKey' => 'id'
+                ],
+                [
+                    'name' => 'risk_probability',
+                    'label' => 'Risk Olasılığı (1-5)',
+                    'type' => 'select',
+                    'required' => true,
+                    'default' => '3',
+                    'options' => [
+                        ['label' => '1 - Çok Nadir', 'value' => '1'],
+                        ['label' => '2 - Nadir', 'value' => '2'],
+                        ['label' => '3 - Olası', 'value' => '3'],
+                        ['label' => '4 - Muhtemel', 'value' => '4'],
+                        ['label' => '5 - Çok Muhtemel', 'value' => '5']
+                    ]
+                ],
+                [
+                    'name' => 'risk_severity',
+                    'label' => 'Risk Şiddeti (1-5)',
+                    'type' => 'select',
+                    'required' => true,
+                    'default' => '3',
+                    'options' => [
+                        ['label' => '1 - Önemsiz', 'value' => '1'],
+                        ['label' => '2 - Hafif', 'value' => '2'],
+                        ['label' => '3 - Orta', 'value' => '3'],
+                        ['label' => '4 - Ağır', 'value' => '4'],
+                        ['label' => '5 - Ölümcül', 'value' => '5']
+                    ]
+                ],
+                [
+                    'name' => 'photos',
+                    'label' => 'Fotoğraflar',
+                    'type' => 'file',
+                    'multiple' => true,
+                ],
+                [
+                    'name' => 'requires_supervisor_approval',
+                    'label' => 'Üst Yönetici Onayı',
+                    'type' => 'boolean',
+                    'default' => false,
+                ],
+                [
+                    'name' => 'supervisor_approver_id',
+                    'label' => 'Üst Yönetici',
+                    'type' => 'select',
+                    'dependsOn' => 'requires_supervisor_approval',
+                    'optionsEndpoint' => 'http://central-auth-and-notification-app.apps.misafirus.com/users/company/{companyId}',
+                    'optionsLabelKey' => 'name',
+                    'optionsValueKey' => 'id',
+                ]
+            ]
+        ];
+
+        Response::success($config);
+    }
+
+    /**
      * POST /api/v1/actions/manual
      * Manuel aksiyon oluştur
      */
