@@ -125,51 +125,87 @@ class FileUploadController
             $uniqueFileName = uniqid() . '_' . time() . '.' . $fileExtension;
             $relativePath = 'uploads/' . date('Y/m/d') . '/' . $uniqueFileName;
 
-            // Görsel dosyaları optimize et
-            $isImage = in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif']);
+            // Görsel dosyaları optimize et ve JPG'e çevir
+            $isImage = in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', 'webp']);
+
+            // Final dosya bilgileri (başlangıçta orijinal)
+            $finalFilePath = $fileTmpName;
+            $finalExtension = $fileExtension;
+            $finalMimeType = $fileTmpName ? mime_content_type($fileTmpName) : '';
+
             if ($isImage) {
-                $fileTmpName = $this->optimizeImage($fileTmpName, $fileExtension);
-                $fileSize = filesize($fileTmpName); // Yeni boyutu al
+                // Optimize et ve her zaman JPG yolunu al
+                $optimizedPath = $this->optimizeImage($fileTmpName, $fileExtension);
+
+                // Eğer optimizasyon yapıldıysa (yol değiştiyse)
+                if ($optimizedPath !== $fileTmpName) {
+                    $finalFilePath = $optimizedPath;
+                    $finalExtension = 'jpg'; // Artık kesinlikle jpg
+
+                    // Dosya adını da güncelle (uzantıyı değiştir)
+                    $uniqueFileName = pathinfo($uniqueFileName, PATHINFO_FILENAME) . '.jpg';
+
+                    // Relative path'i de güncelle
+                    $relativePath = 'uploads/' . date('Y/m/d') . '/' . $uniqueFileName;
+                }
             }
 
             try {
                 if ($this->useS3) {
-                    // S3'e yükle
+                    // S3'e yükle (Final dosya ile)
                     $result = $this->s3Client->putObject([
                         'Bucket' => $this->bucket,
                         'Key' => $relativePath,
-                        'SourceFile' => $fileTmpName,
+                        'SourceFile' => $finalFilePath,
                         'ACL' => 'public-read',
-                        'ContentType' => mime_content_type($fileTmpName),
+                        'ContentType' => mime_content_type($finalFilePath),
                     ]);
 
                     $uploadedFiles[] = [
                         'original_name' => $fileName,
                         'file_name' => $uniqueFileName,
                         'url' => $result['ObjectURL'],
-                        'size' => $fileSize,
-                        'type' => $fileExtension,
+                        'size' => filesize($finalFilePath),
+                        'type' => $finalExtension,
                     ];
                 } else {
                     // Local'e yükle
-                    $uploadDir = rtrim($this->localUploadDir, '/') . '/' . date('Y/m/d');
+                    $uploadDir = rtrim($this->localUploadUrl, '/') . '/' . date('Y/m/d'); // URL değil DIR olmalı, altta fixliyorum
+                    $uploadDirReal = rtrim($this->localUploadDir, '/') . '/' . date('Y/m/d');
 
                     // Klasörü oluştur
-                    if (!is_dir($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
+                    if (!is_dir($uploadDirReal)) {
+                        mkdir($uploadDirReal, 0755, true);
                     }
 
-                    $localFilePath = $uploadDir . '/' . $uniqueFileName;
+                    $localFilePath = $uploadDirReal . '/' . $uniqueFileName;
 
-                    if (move_uploaded_file($fileTmpName, $localFilePath)) {
+                    // optimizeImage zaten dosyayı tmp dizininde veya overwrite ederek düzenledi
+                    // Dosyayı hedef dizine taşıyalım
+                    // move_uploaded_file sadece POST ile gelen dosyalarda çalışır.
+                    // Eğer optimizeImage yeni bir dosya oluşturduysa rename kullanmalıyız.
+                    // Ancak optimizeImage orjinal tmp dosyasının üzerine yazıyorsa move_uploaded_file çalışabilir mi?
+                    // GD/Imagick ile oluşturulan dosya artık "uploaded file" statüsünde olmayabilir.
+                    // Bu yüzden copy/rename + unlink daha güvenli.
+
+                    if (rename($finalFilePath, $localFilePath)) {
+                        // move_uploaded_file yerine rename kullandık çünkü dosya optimize edilmiş olabilir
+                        // ve PHP'nin tmp dizininde bizim oluşturduğumuz bir dosya olabilir.
+
+                        // Eğer orjinal dosya hala duruyorsa ve optimize edilmediyse?
+                        // $finalFilePath == $fileTmpName ise, bu orjinal upload dosyasıdır.
+                        // Ancak optimizeImage içinde override ediyoruz. O yüzden rename güvenlidir. 
+                        // Sadece permission hatası almamak lazım.
+                        // Alternatif: copy + unlink
+
                         $fileUrl = rtrim($this->localUploadUrl, '/') . '/' . date('Y/m/d') . '/' . $uniqueFileName;
 
                         $uploadedFiles[] = [
                             'original_name' => $fileName,
                             'file_name' => $uniqueFileName,
                             'url' => $fileUrl,
-                            'size' => $fileSize,
-                            'type' => $fileExtension,
+                            'size' => filesize($localFilePath),
+                            'type' => $finalExtension,
                         ];
                     } else {
                         $errors[] = [
@@ -177,6 +213,11 @@ class FileUploadController
                             'error' => 'Dosya yükleme hatası: Dosya taşınamadı'
                         ];
                     }
+                }
+
+                // Temp dosyaları temizle (eğer optimize edildiyse ve hala duruyorsa)
+                if ($finalFilePath !== $fileTmpName && file_exists($finalFilePath)) {
+                    @unlink($finalFilePath);
                 }
 
             } catch (AwsException $e) {
@@ -260,18 +301,80 @@ class FileUploadController
     /**
      * Görsel optimizasyonu - boyut küçültme ve metadata temizleme
      */
+    /**
+     * Görsel optimizasyonu - boyut küçültme, formata çevirme (JPG) ve metadata temizleme
+     * Desteklenen formatlar: JPG, PNG, GIF, WEBP, HEIC (Imagick varsa)
+     */
     private function optimizeImage(string $filePath, string $extension): string
     {
-        // HEIC/HEIF için şimdilik optimizasyon yapma (GD desteklemiyor)
+        $maxWidth = 1920;
+        $maxHeight = 1920;
+        $quality = 80;
+
+        // Çıktı her zaman JPG olacak
+        // Eğer filePath zaten .jpg ile bitiyorsa aynı yolu kullan, değilse .jpg ekle/değiştir
+        $outputPath = $filePath;
+        if (strtolower($extension) !== 'jpg' && strtolower($extension) !== 'jpeg') {
+            $outputPath = preg_replace('/\.' . preg_quote($extension, '/') . '$/i', '.jpg', $filePath);
+            // Regex başarısız olursa veya aynı kalırsa (örn uzantı yoksa) sonuna ekle
+            if ($outputPath === $filePath) {
+                $outputPath .= '.jpg';
+            }
+        }
+
+        // 1. Imagick Dene (HEIC ve daha kaliteli dönüşüm için öncelikli)
+        if (extension_loaded('imagick')) {
+            try {
+                $imagick = new \Imagick();
+                $imagick->readImage($filePath);
+
+                // Eğer HEIC ise veya çoklu frame varsa (GIF), sadece ilk kareyi al
+                // (Genellikle profil/belge fotosu olduğu için animasyon gerekmez)
+                // Ama GIF animasyonunu korumak istersek bu adımı atlarız. 
+                // Kullanıcı "hepsini jpg yap" dediği için animasyon ölecek, bu beklenen bir durum.
+                $imagick = $imagick->mergeImageLayers(\Imagick::LAYERMETHOD_FLATTEN);
+
+                // Boyutlandır
+                $width = $imagick->getImageWidth();
+                $height = $imagick->getImageHeight();
+
+                if ($width > $maxWidth || $height > $maxHeight) {
+                    $imagick->resizeImage($maxWidth, $maxHeight, \Imagick::FILTER_LANCZOS, 1, true);
+                }
+
+                // Formatı JPG yap
+                $imagick->setImageFormat('jpg');
+                $imagick->setImageCompression(\Imagick::COMPRESSION_JPEG);
+                $imagick->setImageCompressionQuality($quality);
+
+                // Metadata temizle
+                $imagick->stripImage();
+
+                // Kaydet
+                $imagick->writeImage($outputPath);
+                $imagick->clear();
+                $imagick->destroy();
+
+                // Eğer uzantı değiştiyse eski dosyayı sil
+                if ($filePath !== $outputPath && file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+
+                return $outputPath;
+
+            } catch (\Exception $e) {
+                error_log('Imagick optimizasyon hatası: ' . $e->getMessage() . ' - GD deneniyor...');
+                // Imagick başarısız olursa GD'ye düş
+            }
+        }
+
+        // 2. GD Kütüphanesi (Fallback)
+        // HEIC GD ile native desteklenmez, o yüzden HEIC ise ve Imagick yoksa işlem yapamayız.
         if (in_array($extension, ['heic', 'heif'])) {
+            error_log('GD HEIC desteklemiyor ve Imagick yok. Dosya olduğu gibi bırakılıyor.');
             return $filePath;
         }
 
-        $maxWidth = 1920;  // Max genişlik
-        $maxHeight = 1920; // Max yükseklik
-        $quality = 85;     // JPEG kalitesi (0-100)
-
-        // Görseli yükle
         $image = null;
         switch ($extension) {
             case 'jpg':
@@ -284,62 +387,50 @@ class FileUploadController
             case 'gif':
                 $image = @imagecreatefromgif($filePath);
                 break;
+            case 'webp':
+                $image = @imagecreatefromwebp($filePath);
+                break;
         }
 
         if (!$image) {
-            // Görsel yüklenemezse orijinali döndür
             return $filePath;
         }
 
-        // Mevcut boyutları al
+        // Boyutları al
         $width = imagesx($image);
         $height = imagesy($image);
 
-        // Yeniden boyutlandırma gerekli mi?
-        if ($width <= $maxWidth && $height <= $maxHeight) {
-            // Boyut uygun ama yine de metadata temizle ve kaliteyi düşür
-            $outputPath = $filePath . '.optimized.jpg';
-            imagejpeg($image, $outputPath, $quality);
-            imagedestroy($image);
+        // Yeni boyutları hesapla
+        $newWidth = $width;
+        $newHeight = $height;
 
-            // Eski dosyayı sil, yenisini yerine koy
-            unlink($filePath);
-            rename($outputPath, $filePath);
-
-            return $filePath;
+        if ($width > $maxWidth || $height > $maxHeight) {
+            $ratio = min($maxWidth / $width, $maxHeight / $height);
+            $newWidth = (int) ($width * $ratio);
+            $newHeight = (int) ($height * $ratio);
         }
 
-        // Aspect ratio'yu koru
-        $ratio = min($maxWidth / $width, $maxHeight / $height);
-        $newWidth = (int) ($width * $ratio);
-        $newHeight = (int) ($height * $ratio);
-
-        // Yeni görsel oluştur
         $newImage = imagecreatetruecolor($newWidth, $newHeight);
 
-        // PNG için transparency koru
-        if ($extension === 'png') {
-            imagealphablending($newImage, false);
-            imagesavealpha($newImage, true);
-            $transparent = imagecolorallocatealpha($newImage, 255, 255, 255, 127);
-            imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $transparent);
-        }
+        // Şeffaflık (PNG/GIF) -> Beyaz Arkaplan (JPG için)
+        $white = imagecolorallocate($newImage, 255, 255, 255);
+        imagefilledrectangle($newImage, 0, 0, $newWidth, $newHeight, $white);
 
-        // Yeniden boyutlandır
+        // Resmi kopyala ve yeniden boyutlandır
         imagecopyresampled($newImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
 
-        // Kaydet (her zaman JPEG olarak, metadata'sız)
-        $outputPath = $filePath . '.optimized.jpg';
+        // JPG Olarak Kaydet
         imagejpeg($newImage, $outputPath, $quality);
 
-        // Belleği temizle
+        // Temizlik
         imagedestroy($image);
         imagedestroy($newImage);
 
-        // Eski dosyayı sil, yenisini yerine koy
-        unlink($filePath);
-        rename($outputPath, $filePath);
+        // Eğer uzantı değiştiyse eski dosyayı sil
+        if ($filePath !== $outputPath && file_exists($filePath)) {
+            @unlink($filePath);
+        }
 
-        return $filePath;
+        return $outputPath;
     }
 }
