@@ -396,6 +396,7 @@ class ActionController
         $closure = $this->closureModel->getLatestByAction($id);
         if ($closure) {
             $action['closure_id'] = $closure['id'];
+            $action['closure_status'] = $closure['status']; // YENİ: Frontend için gerekli
             $action['closure_notes'] = $closure['closure_description'];
 
             if (!empty($closure['evidence_files'])) {
@@ -408,6 +409,8 @@ class ActionController
             $action['approval_notes'] = $closure['approval_notes'] ?? null;
             $action['rejection_notes'] = $closure['rejection_notes'] ?? null;
         } else {
+            $action['closure_id'] = null;
+            $action['closure_status'] = null; // YENİ: Frontend için gerekli
             $action['closure_photos'] = [];
             $action['closure_notes'] = null;
             $action['approval_notes'] = null;
