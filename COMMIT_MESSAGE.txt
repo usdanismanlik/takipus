@@ -1,0 +1,60 @@
+feat(hse-api): HSE API bildirim sistemi test edildi ve düzeltmeler yapıldı
+
+## Test Sonuçları
+- ✅ 3 senaryo test edildi, tümü başarılı (%100 başarı oranı)
+- ✅ 13 test geçti, 0 test başarısız
+- ✅ Bildirim sistemi beklendiği gibi çalışıyor
+
+## Yapılan Değişiklikler
+
+### 1. Database Migration'ları
+- `add_photos_to_actions.sql` - actions tablosuna photos kolonu eklendi
+- `2025-12-23_two_stage_approval.sql` - İki aşamalı onay için upper_approver_id eklendi
+- `add_manual_to_source_type.sql` - source_type enum'ına 'manual' eklendi
+- `add_closure_notification_types.sql` - Notification type enum'ına kapatma bildirimleri eklendi
+
+### 2. ActionController Düzeltmeleri
+- `sendClosureRequestToCreator()` - Bildirim tipi 'closure_requested' olarak düzeltildi
+- `sendUpperApprovalRequest()` - Bildirim tipi 'upper_approval_required' olarak düzeltildi
+
+### 3. Test Scripti
+- `test-notification-system.js` - Kapsamlı test scripti oluşturuldu
+  - 3 kullanıcı rolü ile test (Creator, Assignee, Manager)
+  - 3 senaryo: Basit aksiyon, Üst yönetici onaylı, Red senaryosu
+  - Otomatik bildirim kontrolü
+
+## Test Edilen Senaryolar
+
+### Senaryo 1: Basit Aksiyon (Üst Yönetici Onayı YOK)
+- Creator aksiyon oluşturur → Assignee'ye bildirim
+- Assignee kapatma talebi gönderir → Creator'a bildirim
+- Creator onaylar → Aksiyon tamamlanır → Assignee'ye bildirim
+
+### Senaryo 2: Üst Yönetici Onaylı Aksiyon
+- Creator aksiyon oluşturur (Manager ile) → Assignee'ye bildirim
+- Assignee kapatma talebi gönderir → Creator'a bildirim
+- Creator ilk onayı verir → Manager'a bildirim
+- Manager ikinci onayı verir → Aksiyon tamamlanır → Assignee ve Creator'a bildirim
+
+### Senaryo 3: Red Senaryosu
+- Creator aksiyon oluşturur → Assignee'ye bildirim
+- Assignee kapatma talebi gönderir → Creator'a bildirim
+- Creator reddeder → Assignee'ye red bildirimi → Aksiyon "open" durumuna döner
+
+## Doğrulanan Bildirim Tipleri
+- ✅ action_assigned
+- ✅ closure_requested
+- ✅ upper_approval_required
+- ✅ action_completed
+- ✅ closure_rejected
+
+## Test Kullanıcıları
+- Creator: b@aa.com (ID: 2430)
+- Assignee: a@aa.com (ID: 2399)
+- Manager: c@aa.com (ID: 2431)
+- Company: F9946
+
+## Dosyalar
+- database/migrations/add_closure_notification_types.sql
+- src/Controllers/ActionController.php
+- test-notification-system.js

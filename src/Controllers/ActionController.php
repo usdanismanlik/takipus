@@ -233,6 +233,27 @@ class ActionController
             ]);
         }
 
+        // Üst yöneticiye bildirim
+        if (isset($data['upper_approver_id']) && $data['upper_approver_id'] > 0) {
+            $assignedUserName = $this->getUserName($data['assigned_to_user_id'] ?? null);
+
+            $this->notificationModel->create([
+                'user_id' => $data['upper_approver_id'],
+                'type' => 'action_created',
+                'title' => 'Yeni Aksiyon Oluşturuldu',
+                'message' => "Yeni bir aksiyon oluşturuldu ve {$assignedUserName} kişisine atandı: {$data['title']}",
+                'related_type' => 'action',
+                'related_id' => $actionId,
+            ]);
+
+            CoreService::sendPushNotification(
+                (int) $data['upper_approver_id'],
+                'Yeni Aksiyon Oluşturuldu',
+                "Yeni aksiyon: {$data['title']} - Atanan: {$assignedUserName}",
+                ['action_id' => $actionId, 'type' => 'action_created']
+            );
+        }
+
         // Audit log
         $action = $this->actionModel->find($actionId);
         AuditLogger::logCreate(
@@ -798,13 +819,35 @@ class ActionController
             ]);
 
             // Aksiyonu open durumuna al
-            $this->actionModel->update($id, ['status' => 'open']);
+            $this->actionModel->update($id, [
+                'status' => 'open',
+            ]);
 
-            // Atanan kullanıcıya bildirim gönder
+            // Atanan kullanıcıya red bildirimi gönder
             $this->sendClosureRejectedNotification($action, $data['review_notes'], 'creator');
 
-            $message = 'Kapatma talebi reddedildi';
+            // Üst yöneticiye de red bildirimi gönder
+            if (!empty($action['upper_approver_id'])) {
+                $assignedUserName = $this->getUserName($action['assigned_to_user_id']);
 
+                $this->notificationModel->create([
+                    'user_id' => $action['upper_approver_id'],
+                    'type' => 'closure_rejected',
+                    'title' => 'Kapatma Talebi Reddedildi',
+                    'message' => "{$assignedUserName} tarafından gönderilen '{$action['title']}' kapatma talebi reddedildi",
+                    'related_type' => 'action',
+                    'related_id' => $action['id'],
+                ]);
+
+                CoreService::sendPushNotification(
+                    (int) $action['upper_approver_id'],
+                    'Kapatma Talebi Reddedildi',
+                    "{$assignedUserName} - {$action['title']}",
+                    ['action_id' => $action['id'], 'type' => 'closure_rejected']
+                );
+            }
+
+            $message = 'Kapatma talebi reddedildi ve aksiyon tekrar açıldı.';
         } else if ($closure['status'] === 'first_approved') {
             // İkinci seviye red - Upper approver tarafından
             if (empty($action['upper_approver_id']) || $reviewedBy != $action['upper_approver_id']) {
@@ -999,7 +1042,7 @@ class ActionController
 
         $this->notificationModel->create([
             'user_id' => $action['created_by'],
-            'type' => 'action_status_changed',
+            'type' => 'closure_requested',
             'title' => 'Kapatma Talebi Onayınızı Bekliyor',
             'message' => "'{$action['title']}' aksiyonu için kapatma talebi gönderildi. Lütfen onaylayın.",
             'related_type' => 'action',
@@ -1055,8 +1098,9 @@ class ActionController
             'user_id' => $action['upper_approver_id'],
             'title' => 'Üst Yönetici Onayı Gerekli',
             'message' => "'{$action['title']}' aksiyonu için kapatma talebi onayınızı bekliyor",
-            'type' => 'closure_upper_approval',
-            'data' => json_encode(['action_id' => $action['id'], 'closure_id' => $closureId]),
+            'type' => 'upper_approval_required',
+            'related_type' => 'action',
+            'related_id' => $action['id'],
         ]);
 
         CoreService::sendPushNotification(
@@ -1134,5 +1178,19 @@ class ActionController
             "{$rejectorTitle} kapatma talebini reddetti",
             ['action_id' => $action['id'], 'type' => 'closure_rejected']
         );
+    }
+
+    /**
+     * Kullanıcı adını al (fallback olarak user ID kullan)
+     */
+    private function getUserName(?int $userId): string
+    {
+        if (!$userId) {
+            return 'Bilinmeyen Kullanıcı';
+        }
+
+        // TODO: CoreService'den kullanıcı bilgisi çek
+        // Şimdilik user ID kullan
+        return "Kullanıcı #{$userId}";
     }
 }
