@@ -15,7 +15,7 @@ const http = require('http');
 // Test Konfigürasyonu
 const CONFIG = {
     AUTH_API: 'http://central-auth-and-notification-app.apps.misafirus.com',
-    HSE_API: 'http://localhost:8081', // Docker container üzerinden erişim
+    HSE_API: 'https://takipus.apps.misafirus.com', // Production API
     USERS: {
         creator: { email: 'b@aa.com', id: 2430, name: 'Aksiyon Açan' },
         assignee: { email: 'a@aa.com', id: 2399, name: 'Aksiyon Atanan' },

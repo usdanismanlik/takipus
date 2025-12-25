@@ -4,6 +4,7 @@ namespace Src\Controllers;
 
 use Src\Models\Action;
 use Src\Models\ActionClosure;
+use Src\Models\ActionTimeline;
 use Src\Models\Notification;
 use Src\Helpers\Response;
 use Src\Helpers\AuditLogger;
@@ -14,6 +15,7 @@ class ActionController
 {
     private Action $actionModel;
     private ActionClosure $closureModel;
+    private ActionTimeline $timelineModel;
     private Notification $notificationModel;
     private \PDO $db;
 
@@ -21,6 +23,7 @@ class ActionController
     {
         $this->actionModel = new Action();
         $this->closureModel = new ActionClosure();
+        $this->timelineModel = new ActionTimeline();
         $this->notificationModel = new Notification();
 
         // Database bağlantısını al
@@ -418,6 +421,33 @@ class ActionController
         }
 
         Response::success($action);
+    }
+
+    /**
+     * GET /api/v1/actions/:id/timeline
+     * Aksiyonun timeline'ını getir
+     */
+    public function getTimeline(int $id): void
+    {
+        $action = $this->actionModel->find($id);
+        if (!$action) {
+            Response::error('Aksiyon bulunamadı', 404);
+            return;
+        }
+
+        $timeline = $this->timelineModel->getByAction($id);
+
+        // Metadata'yı decode et ve kullanıcı bilgilerini ekle
+        foreach ($timeline as &$event) {
+            if ($event['metadata']) {
+                $event['metadata'] = json_decode($event['metadata'], true);
+            }
+
+            // Kullanıcı adını ekle
+            $event['user_name'] = $this->getUserName($event['user_id']);
+        }
+
+        Response::success($timeline);
     }
 
     /**

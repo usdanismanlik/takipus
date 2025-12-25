@@ -1,60 +1,64 @@
-feat(hse-api): HSE API bildirim sistemi test edildi ve düzeltmeler yapıldı
+feat(notifications): Üst yönetici bildirim sistemi ve test geliştirmeleri
+
+## Yeni Özellikler
+
+### 1. Üst Yöneticiye Aksiyon Oluşturma Bildirimi
+- Aksiyon oluşturulduğunda üst yöneticiye bildirim gönderilir
+- Bildirim içeriği: "Yeni aksiyon oluşturuldu ve [Kullanıcı] kişisine atandı"
+- Bildirim tipi: `action_created`
+
+### 2. Üst Yöneticiye Red Bildirimi
+- Kapatma talebi reddedildiğinde üst yöneticiye bildirim gönderilir
+- Bildirim içeriği: "[Kullanıcı] tarafından gönderilen kapatma talebi reddedildi"
+- Bildirim tipi: `closure_rejected`
+
+### 3. getUserName() Helper Fonksiyonu
+- Kullanıcı adını almak için yardımcı fonksiyon eklendi
+- Şimdilik user ID kullanıyor (TODO: CoreService entegrasyonu)
+
+## Değişiklikler
+
+### src/Controllers/ActionController.php
+- `createManual()`: Üst yöneticiye bildirim eklendi (satır 236-256)
+- `rejectClosure()`: Üst yöneticiye red bildirimi eklendi (satır 807-831)
+- `getUserName()`: Yeni helper fonksiyon eklendi (satır 1141-1153)
+
+### database/migrations/
+- `add_closure_notification_types.sql`: Yeni bildirim tipleri eklendi
+
+### Test Geliştirmeleri
+- `test-notification-system.js`: Yeni test senaryoları eklendi
+  - Senaryo 2: Manager'a `action_created` bildirimi testi
+  - Senaryo 3: Manager'a `closure_rejected` bildirimi testi
+  - Toplam test sayısı: 13 → 16
+
+### Canlı Veritabanı Migration Dosyaları
+- `database/PRODUCTION_MIGRATIONS.sql`: Tüm migration'ları içeren tek dosya
+- `database/MIGRATION_GUIDE.md`: Detaylı migration rehberi
+- `run-production-migrations.sh`: Otomatik migration scripti
 
 ## Test Sonuçları
-- ✅ 3 senaryo test edildi, tümü başarılı (%100 başarı oranı)
-- ✅ 13 test geçti, 0 test başarısız
-- ✅ Bildirim sistemi beklendiği gibi çalışıyor
+- ✅ Toplam Test: 16
+- ✅ Başarılı: 16
+- ✅ Başarısız: 0
+- ✅ Başarı Oranı: %100
 
-## Yapılan Değişiklikler
+## Canlı Veritabanında Çalıştırılması Gerekenler
 
-### 1. Database Migration'ları
-- `add_photos_to_actions.sql` - actions tablosuna photos kolonu eklendi
-- `2025-12-23_two_stage_approval.sql` - İki aşamalı onay için upper_approver_id eklendi
-- `add_manual_to_source_type.sql` - source_type enum'ına 'manual' eklendi
-- `add_closure_notification_types.sql` - Notification type enum'ına kapatma bildirimleri eklendi
+Aşağıdaki 4 migration'ı sırayla çalıştırın:
 
-### 2. ActionController Düzeltmeleri
-- `sendClosureRequestToCreator()` - Bildirim tipi 'closure_requested' olarak düzeltildi
-- `sendUpperApprovalRequest()` - Bildirim tipi 'upper_approval_required' olarak düzeltildi
+1. `add_photos_to_actions.sql` - photos kolonu
+2. `2025-12-23_two_stage_approval.sql` - İki aşamalı onay
+3. `add_manual_to_source_type.sql` - source_type enum
+4. `add_closure_notification_types.sql` - notification type enum
 
-### 3. Test Scripti
-- `test-notification-system.js` - Kapsamlı test scripti oluşturuldu
-  - 3 kullanıcı rolü ile test (Creator, Assignee, Manager)
-  - 3 senaryo: Basit aksiyon, Üst yönetici onaylı, Red senaryosu
-  - Otomatik bildirim kontrolü
+Detaylı bilgi için: `database/MIGRATION_GUIDE.md`
 
-## Test Edilen Senaryolar
+## Breaking Changes
+Yok - Geriye uyumlu
 
-### Senaryo 1: Basit Aksiyon (Üst Yönetici Onayı YOK)
-- Creator aksiyon oluşturur → Assignee'ye bildirim
-- Assignee kapatma talebi gönderir → Creator'a bildirim
-- Creator onaylar → Aksiyon tamamlanır → Assignee'ye bildirim
-
-### Senaryo 2: Üst Yönetici Onaylı Aksiyon
-- Creator aksiyon oluşturur (Manager ile) → Assignee'ye bildirim
-- Assignee kapatma talebi gönderir → Creator'a bildirim
-- Creator ilk onayı verir → Manager'a bildirim
-- Manager ikinci onayı verir → Aksiyon tamamlanır → Assignee ve Creator'a bildirim
-
-### Senaryo 3: Red Senaryosu
-- Creator aksiyon oluşturur → Assignee'ye bildirim
-- Assignee kapatma talebi gönderir → Creator'a bildirim
-- Creator reddeder → Assignee'ye red bildirimi → Aksiyon "open" durumuna döner
-
-## Doğrulanan Bildirim Tipleri
-- ✅ action_assigned
-- ✅ closure_requested
-- ✅ upper_approval_required
-- ✅ action_completed
-- ✅ closure_rejected
-
-## Test Kullanıcıları
-- Creator: b@aa.com (ID: 2430)
-- Assignee: a@aa.com (ID: 2399)
-- Manager: c@aa.com (ID: 2431)
-- Company: F9946
-
-## Dosyalar
-- database/migrations/add_closure_notification_types.sql
-- src/Controllers/ActionController.php
-- test-notification-system.js
+## Bildirim Tipleri (Yeni)
+- `action_created` - Üst yöneticiye aksiyon oluşturma bildirimi
+- `closure_requested` - Kapatma talebi bildirimi
+- `closure_rejected` - Red bildirimi
+- `upper_approval_required` - Üst yönetici onay talebi

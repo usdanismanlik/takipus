@@ -65,9 +65,11 @@ $router->delete('/api/v1/free-nonconformities/:id', 'FreeNonConformityController
 
 // Action Endpoints
 $router->get('/api/v1/actions/form-config', 'ActionController@getFormConfig');
-$router->post('/api/v1/actions/manual', 'ActionController@createManual');
+// Timeline endpoint - :id'den önce olmalı
+$router->get('/api/v1/actions/:id/timeline', 'ActionController@getTimeline');
 $router->get('/api/v1/actions', 'ActionController@index');
 $router->get('/api/v1/actions/:id', 'ActionController@show');
+$router->post('/api/v1/actions/manual', 'ActionController@createManual');
 $router->put('/api/v1/actions/:id', 'ActionController@update');
 $router->put('/api/v1/actions/:id/complete', 'ActionController@complete');
 
