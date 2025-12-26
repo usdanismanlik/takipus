@@ -127,8 +127,11 @@ class ChecklistController
 
                 // Sorumlu kullanıcıları JSON olarak kaydet
                 $responsibleUserIds = null;
-                if (isset($question['responsible_user_ids']) && is_array($question['responsible_user_ids'])) {
+                if (isset($question['responsible_user_ids']) && is_array($question['responsible_user_ids']) && !empty($question['responsible_user_ids'])) {
                     $responsibleUserIds = json_encode($question['responsible_user_ids']);
+                } elseif (isset($question['responsible_user_id']) && !empty($question['responsible_user_id'])) {
+                    // Tek sorumlu varsa ve boş değilse array'e çevir
+                    $responsibleUserIds = json_encode([$question['responsible_user_id']]);
                 }
 
                 $this->questionModel->create([
@@ -218,10 +221,10 @@ class ChecklistController
 
                 // Sorumlu kullanıcıları JSON olarak kaydet
                 $responsibleUserIds = null;
-                if (isset($question['responsible_user_ids']) && is_array($question['responsible_user_ids'])) {
+                if (isset($question['responsible_user_ids']) && is_array($question['responsible_user_ids']) && !empty($question['responsible_user_ids'])) {
                     $responsibleUserIds = json_encode($question['responsible_user_ids']);
-                } elseif (isset($question['responsible_user_id'])) {
-                    // Tek sorumlu varsa array'e çevir
+                } elseif (isset($question['responsible_user_id']) && !empty($question['responsible_user_id'])) {
+                    // Tek sorumlu varsa ve boş değilse array'e çevir
                     $responsibleUserIds = json_encode([$question['responsible_user_id']]);
                 }
 
