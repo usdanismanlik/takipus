@@ -28,13 +28,16 @@ set_exception_handler(function ($e) {
 CorsMiddleware::handle();
 
 // Serve static files (test-ui.html, test-images/*)
-$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$staticFiles = ['/test-ui.html'];
-$staticDirs = ['/test-images/'];
+$requestUri = $_SERVER['REQUEST_URI'];
+$parsedPath = parse_url($requestUri, PHP_URL_PATH);
 
-// Check if requesting a static file
-if (in_array($requestUri, $staticFiles)) {
-    $filePath = __DIR__ . $requestUri;
+// Debug log
+error_log("REQUEST_URI: " . $requestUri);
+error_log("Parsed Path: " . $parsedPath);
+
+// Static files
+if ($parsedPath === '/test-ui.html') {
+    $filePath = __DIR__ . '/test-ui.html';
     if (file_exists($filePath)) {
         header('Content-Type: text/html; charset=utf-8');
         readfile($filePath);
@@ -42,16 +45,14 @@ if (in_array($requestUri, $staticFiles)) {
     }
 }
 
-// Check if requesting a file from static directories
-foreach ($staticDirs as $dir) {
-    if (strpos($requestUri, $dir) === 0) {
-        $filePath = __DIR__ . $requestUri;
-        if (file_exists($filePath)) {
-            $mimeType = mime_content_type($filePath);
-            header('Content-Type: ' . $mimeType);
-            readfile($filePath);
-            exit;
-        }
+// Static directories (test-images)
+if (strpos($parsedPath, '/test-images/') === 0) {
+    $filePath = __DIR__ . $parsedPath;
+    if (file_exists($filePath)) {
+        $mimeType = mime_content_type($filePath);
+        header('Content-Type: ' . $mimeType);
+        readfile($filePath);
+        exit;
     }
 }
 
