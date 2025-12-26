@@ -245,7 +245,7 @@ class FieldTourController
 
         // Timeline kaydı oluştur
         $metadata = [
-            'assigned_to' => CoreService::getUserName($assignedToUserId),
+            'assigned_to' => $assignedToUserId ? CoreService::getUserName($assignedToUserId) : null,
             'due_date' => $data['due_date'] ?? null,
             'risk_level' => $riskInfo['level'],
             'photos' => $photos ? json_decode($photos, true) : null,
