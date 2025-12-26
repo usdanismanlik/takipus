@@ -27,6 +27,34 @@ set_exception_handler(function ($e) {
 // CORS
 CorsMiddleware::handle();
 
+// Serve static files (test-ui.html, test-images/*)
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$staticFiles = ['/test-ui.html'];
+$staticDirs = ['/test-images/'];
+
+// Check if requesting a static file
+if (in_array($requestUri, $staticFiles)) {
+    $filePath = __DIR__ . $requestUri;
+    if (file_exists($filePath)) {
+        header('Content-Type: text/html; charset=utf-8');
+        readfile($filePath);
+        exit;
+    }
+}
+
+// Check if requesting a file from static directories
+foreach ($staticDirs as $dir) {
+    if (strpos($requestUri, $dir) === 0) {
+        $filePath = __DIR__ . $requestUri;
+        if (file_exists($filePath)) {
+            $mimeType = mime_content_type($filePath);
+            header('Content-Type: ' . $mimeType);
+            readfile($filePath);
+            exit;
+        }
+    }
+}
+
 // Router
 $router = new Router();
 
