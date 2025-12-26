@@ -169,7 +169,8 @@ class ChecklistController
      */
     public function update(int $id): void
     {
-        $data = json_decode(file_get_contents('php://input'), true);
+        // FormData veya JSON parse et
+        $data = $_POST ?: json_decode(file_get_contents('php://input'), true);
 
         // Checklist var mı kontrol et
         $checklist = $this->checklistModel->find($id);
