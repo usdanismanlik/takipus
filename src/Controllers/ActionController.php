@@ -89,7 +89,7 @@ class ActionController
                     'label' => 'Atanan Kişi',
                     'type' => 'select',
                     'required' => true,
-                    'optionsEndpoint' => 'http://central-auth-and-notification-app.apps.misafirus.com/users/company/{companyId}',
+                    'optionsEndpoint' => 'http://auth-notfy-app.misafirus.com/users/company/{companyId}',
                     'optionsLabelKey' => 'name',
                     'optionsValueKey' => 'id'
                 ],
@@ -138,7 +138,7 @@ class ActionController
                     'label' => 'Üst Yönetici',
                     'type' => 'select',
                     'dependsOn' => 'requires_supervisor_approval',
-                    'optionsEndpoint' => 'http://central-auth-and-notification-app.apps.misafirus.com/users/company/{companyId}',
+                    'optionsEndpoint' => 'http://auth-notfy-app.misafirus.com/users/company/{companyId}',
                     'optionsLabelKey' => 'name',
                     'optionsValueKey' => 'id',
                 ]
