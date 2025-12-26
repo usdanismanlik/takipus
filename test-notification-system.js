@@ -14,7 +14,7 @@ const http = require('http');
 
 // Test Konfigürasyonu
 const CONFIG = {
-    AUTH_API: 'http://central-auth-and-notification-app.apps.misafirus.com',
+    AUTH_API: 'http://auth-notfy-app.misafirus.com',
     HSE_API: 'https://takipus.apps.misafirus.com', // Production API
     USERS: {
         creator: { email: 'b@aa.com', id: 2430, name: 'Aksiyon Açan' },

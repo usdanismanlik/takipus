@@ -1,0 +1,25 @@
+feat(timeline): Otomatik timeline kayıtları eklendi
+
+Timeline Kayıtları:
+- createManual(): Aksiyon oluşturulduğunda timeline kaydı
+  * Event type: 'created'
+  * Metadata: assigned_to, due_date, risk_level, photos
+  
+- requestClosure(): Kapatma talebi gönderildiğinde
+  * Event type: 'closure_requested'
+  * Metadata: photos (evidence files)
+  
+- approveClosure(): Kapatma onaylandığında
+  * Event type: 'closure_approved'
+  * İlk onay ve final onay ayrımı yapılıyor
+  * Metadata: approval_type, previous_status, new_status
+  
+- rejectClosure(): Kapatma reddedildiğinde
+  * Event type: 'closure_rejected'
+  * Metadata: previous_status, new_status
+
+Her işlemde otomatik olarak timeline kaydı oluşturuluyor.
+Kullanıcı adları getUserName() ile ekleniyor.
+
+Değişiklikler:
+- src/Controllers/ActionController.php: 4 metoda timeline kayıtları eklendi

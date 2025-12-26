@@ -1,0 +1,35 @@
+fix(checklist): Foreign key constraint hatası düzeltildi
+
+Sorun:
+- Checklist güncellenirken tüm sorular siliniyor ve yeniden oluşturuluyordu
+- field_tour_responses tablosunda referansı olan sorular silinemiyordu
+- "Integrity constraint violation: 1451" hatası alınıyordu
+
+Çözüm:
+- UPDATE/INSERT mantığı eklendi
+- Mevcut sorular UPDATE ediliyor
+- Yeni sorular INSERT ediliyor
+- Silinecek sorular için önce response kontrolü yapılıyor
+- Response varsa soru silinmiyor (soft delete)
+
+Değişiklikler:
+- ChecklistController::update()
+  * deleteByChecklist() yerine UPDATE/INSERT mantığı
+  * Mevcut soruları al, ID'lerini karşılaştır
+  * Gelen sorularda ID varsa UPDATE, yoksa INSERT
+  * Silinecek sorular için hasResponses() kontrolü
+  
+- ChecklistQuestion::hasResponses()
+  * field_tour_responses tablosunda response var mı kontrol et
+  * Foreign key constraint ihlalini önle
+
+Ek İyileştirmeler:
+- responsible_user_id (tekil) desteği eklendi
+- responsible_user_ids (çoğul) ile uyumlu
+
+Test:
+- Checklist güncelleme (sadece general_responsible_id)
+- Soru ekleme
+- Soru güncelleme
+- Response'u olan soru silme (korunmalı)
+- Response'u olmayan soru silme (silinmeli)

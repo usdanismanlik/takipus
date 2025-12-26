@@ -1,0 +1,29 @@
+feat(api): getActions ve getAction metodlarına kullanıcı isim alanları eklendi
+
+Yeni Alanlar:
+- assigned_to_user_name: Aksiyonun atandığı kişinin adı
+- upper_approver_user_name: Üst yöneticinin adı
+- created_user_name: Aksiyonu oluşturan kişinin adı
+
+Değişiklikler:
+- index() metodu: Her aksiyon için kullanıcı isimleri eklendi
+- show() metodu: Aksiyon detayında kullanıcı isimleri eklendi
+
+Kullanım:
+- Frontend'de "Kullanıcı #2430" yerine "Aksiyon Açan" gösterilecek
+- Mobil ve web uygulamalarda tek API çağrısı ile tüm bilgiler gelecek
+- CoreService::getUserName() ile mobileAppLogin API'den çekiliyor
+
+Test:
+- GET /api/v1/actions?company_id=1
+- GET /api/v1/actions/1
+
+Örnek Response:
+{
+  "assigned_to_user_id": 2430,
+  "assigned_to_user_name": "Aksiyon Açan",
+  "upper_approver_id": 2399,
+  "upper_approver_user_name": "Üst Yönetici",
+  "created_by": 2430,
+  "created_user_name": "Aksiyon Açan"
+}

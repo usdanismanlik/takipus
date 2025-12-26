@@ -1,0 +1,22 @@
+feat(test): Test UI ve örnek görseller eklendi
+
+Test UI:
+- test-ui.html: HSE API test arayüzü
+- Aksiyon oluşturma, kapatma, onay/red senaryoları
+- Görsel upload entegrasyonu
+- Otomatik timeline testi
+
+Örnek Görseller:
+- test-images/: 6 adet HSE güvenlik görseli
+  * 3 risk görseli (ıslak zemin, kablo, acil çıkış)
+  * 3 kanıt görseli (temizlenmiş, düzenlenmiş, açılmış)
+
+Özellikler:
+- uploadImages(): Görselleri upload endpoint'ine yükler
+- createAction(): Otomatik risk görselleri ekler
+- requestClosure(): Otomatik kanıt görselleri ekler
+- 3 test senaryosu (basit, üst yönetici onaylı, red)
+
+Kullanım:
+- https://takipus.apps.misafirus.com/test-ui.html
+- Aynı domain'den istek atıldığı için CORS sorunu yok

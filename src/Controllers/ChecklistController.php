@@ -134,8 +134,8 @@ class ChecklistController
                     'order_num' => $question['order_num'] ?? 1,
                     'question_text' => $question['question_text'],
                     'question_type' => $question['question_type'],
-                    'is_required' => isset($question['is_required']) ? (int)$question['is_required'] : 1,
-                    'photo_required' => isset($question['photo_required']) ? (int)$question['photo_required'] : 0,
+                    'is_required' => isset($question['is_required']) ? (int) $question['is_required'] : 1,
+                    'photo_required' => isset($question['photo_required']) ? (int) $question['photo_required'] : 0,
                     'help_text' => $question['help_text'] ?? null,
                     'min_score' => $question['min_score'] ?? null,
                     'max_score' => $question['max_score'] ?? null,
@@ -145,7 +145,7 @@ class ChecklistController
         }
 
         $checklist = $this->checklistModel->withQuestions($checklistId);
-        
+
         // Audit log
         AuditLogger::logCreate(
             '/api/v1/checklists',
@@ -154,7 +154,7 @@ class ChecklistController
             $checklist,
             $data['created_by'] ?? null
         );
-        
+
         Response::success($checklist, 'Checklist başarıyla oluşturuldu', 201);
     }
 
@@ -175,11 +175,16 @@ class ChecklistController
 
         // Checklist bilgilerini güncelle
         $updateData = [];
-        if (isset($data['name'])) $updateData['name'] = $data['name'];
-        if (isset($data['description'])) $updateData['description'] = $data['description'];
-        if (isset($data['status'])) $updateData['status'] = $data['status'];
-        if (isset($data['company_id'])) $updateData['company_id'] = $data['company_id'];
-        if (isset($data['general_responsible_id'])) $updateData['general_responsible_id'] = $data['general_responsible_id'];
+        if (isset($data['name']))
+            $updateData['name'] = $data['name'];
+        if (isset($data['description']))
+            $updateData['description'] = $data['description'];
+        if (isset($data['status']))
+            $updateData['status'] = $data['status'];
+        if (isset($data['company_id']))
+            $updateData['company_id'] = $data['company_id'];
+        if (isset($data['general_responsible_id']))
+            $updateData['general_responsible_id'] = $data['general_responsible_id'];
 
         if (!empty($updateData)) {
             $this->checklistModel->update($id, $updateData);
@@ -187,10 +192,12 @@ class ChecklistController
 
         // Sorular güncellenecekse
         if (isset($data['questions']) && is_array($data['questions'])) {
-            // Mevcut soruları sil
-            $this->questionModel->deleteByChecklist($id);
+            // Mevcut soruları al
+            $existingQuestions = $this->questionModel->getByChecklist($id);
+            $existingQuestionIds = array_column($existingQuestions, 'id');
+            $updatedQuestionIds = [];
 
-            // Yeni soruları ekle
+            // Gelen soruları işle (UPDATE veya INSERT)
             foreach ($data['questions'] as $question) {
                 if (!isset($question['question_text']) || !isset($question['question_type'])) {
                     continue;
@@ -208,25 +215,53 @@ class ChecklistController
                 $responsibleUserIds = null;
                 if (isset($question['responsible_user_ids']) && is_array($question['responsible_user_ids'])) {
                     $responsibleUserIds = json_encode($question['responsible_user_ids']);
+                } elseif (isset($question['responsible_user_id'])) {
+                    // Tek sorumlu varsa array'e çevir
+                    $responsibleUserIds = json_encode([$question['responsible_user_id']]);
                 }
 
-                $this->questionModel->create([
+                $questionData = [
                     'checklist_id' => $id,
                     'order_num' => $question['order_num'] ?? 1,
                     'question_text' => $question['question_text'],
                     'question_type' => $question['question_type'],
-                    'is_required' => isset($question['is_required']) ? (int)$question['is_required'] : 1,
-                    'photo_required' => isset($question['photo_required']) ? (int)$question['photo_required'] : 0,
+                    'is_required' => isset($question['is_required']) ? (int) $question['is_required'] : 1,
+                    'photo_required' => isset($question['photo_required']) ? (int) $question['photo_required'] : 0,
                     'help_text' => $question['help_text'] ?? null,
                     'min_score' => $question['min_score'] ?? null,
                     'max_score' => $question['max_score'] ?? null,
                     'responsible_user_ids' => $responsibleUserIds,
-                ]);
+                ];
+
+                // Eğer question ID varsa UPDATE, yoksa INSERT
+                if (isset($question['id']) && in_array($question['id'], $existingQuestionIds)) {
+                    // Mevcut soruyu güncelle
+                    $this->questionModel->update($question['id'], $questionData);
+                    $updatedQuestionIds[] = $question['id'];
+                } else {
+                    // Yeni soru ekle
+                    $newQuestionId = $this->questionModel->create($questionData);
+                    $updatedQuestionIds[] = $newQuestionId;
+                }
+            }
+
+            // Silinmesi gereken soruları bul (gelen listede olmayan mevcut sorular)
+            // NOT: Sadece field_tour_responses'ta referansı OLMAYAN soruları sil
+            $questionsToDelete = array_diff($existingQuestionIds, $updatedQuestionIds);
+            foreach ($questionsToDelete as $questionId) {
+                // Önce bu soruya ait response var mı kontrol et
+                $hasResponses = $this->questionModel->hasResponses($questionId);
+                if (!$hasResponses) {
+                    // Response yoksa güvenle sil
+                    $this->questionModel->delete($questionId);
+                }
+                // Response varsa silme, sadece bırak (soft delete alternatifi)
             }
         }
 
+
         $updatedChecklist = $this->checklistModel->withQuestions($id);
-        
+
         // Audit log
         AuditLogger::logUpdate(
             '/api/v1/checklists/' . $id,
@@ -236,7 +271,7 @@ class ChecklistController
             $updatedChecklist,
             $checklist['created_by']
         );
-        
+
         Response::success($updatedChecklist, 'Checklist başarıyla güncellendi');
     }
 
@@ -255,7 +290,7 @@ class ChecklistController
         // Soft delete - status'u archived yap
         $oldValues = $checklist;
         $this->checklistModel->update($id, ['status' => 'archived']);
-        
+
         // Audit log
         AuditLogger::logUpdate(
             '/api/v1/checklists/' . $id,
@@ -265,7 +300,7 @@ class ChecklistController
             ['status' => 'archived'],
             $checklist['created_by']
         );
-        
+
         Response::success(null, 'Checklist arşivlendi');
     }
 }

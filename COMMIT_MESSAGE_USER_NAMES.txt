@@ -1,0 +1,29 @@
+feat(api): Kullanıcı isimlerini mobileAppLogin API'sinden çekme
+
+CoreService Güncellemeleri:
+- getUserMeta(): mobileAppLogin API'den kullanıcı meta bilgilerini getir
+  * Endpoint: GET /users/{userId}/meta
+  * 5 saniye timeout
+  * Error handling ve logging
+  
+- getUserName(): Kullanıcı adını getir (static cache ile)
+  * Static cache ile performans optimizasyonu
+  * Aynı request içinde aynı kullanıcı için tek API çağrısı
+  * Fallback: "Kullanıcı #ID" (API erişilemezse)
+
+ActionController Güncellemeleri:
+- getUserName(): CoreService::getUserName() kullanacak şekilde güncellendi
+- "Kullanıcı #2430" yerine "Aksiyon Açan" gibi gerçek isimler
+
+Kullanım Yerleri:
+- Timeline'da user_name alanı
+- Timeline metadata'da assigned_to
+- Tüm kullanıcı referansları
+
+Değişiklikler:
+- src/Services/CoreService.php: getUserMeta() ve getUserName() eklendi
+- src/Controllers/ActionController.php: getUserName() güncellendi
+
+Test:
+- curl https://takipus.apps.misafirus.com/api/v1/actions/1/timeline
+- user_name alanında gerçek kullanıcı isimleri görünecek

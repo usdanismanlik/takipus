@@ -33,4 +33,16 @@ class ChecklistQuestion extends Model
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([$checklistId]);
     }
+
+    /**
+     * Soruya ait response var mı kontrol et
+     */
+    public function hasResponses(int $questionId): bool
+    {
+        $sql = "SELECT COUNT(*) as count FROM field_tour_responses WHERE question_id = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$questionId]);
+        $result = $stmt->fetch();
+        return $result['count'] > 0;
+    }
 }

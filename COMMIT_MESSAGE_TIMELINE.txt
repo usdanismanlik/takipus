@@ -1,0 +1,30 @@
+feat(timeline): Action timeline özelliği - Backend altyapısı
+
+Veritabanı:
+- action_timeline tablosu oluşturuldu
+- Event tipleri: created, assigned, closure_requested, closure_approved, 
+  closure_rejected, status_changed, note_added, photo_added
+- Foreign key ile actions tablosuna bağlandı
+- Metadata JSON alanı ile ek bilgiler saklanıyor
+
+Model:
+- ActionTimeline model eklendi
+- getByAction() - aksiyona göre timeline getir
+- addEvent() - yeni timeline kaydı ekle
+
+Controller:
+- ActionController'a ActionTimeline model entegre edildi
+- getTimeline() endpoint eklendi (GET /api/v1/actions/:id/timeline)
+- Kullanıcı adları timeline'a ekleniyor
+
+Route:
+- /api/v1/actions/:id/timeline route eklendi
+
+Migration:
+- database/migrations/create_action_timeline.sql
+
+Sonraki adımlar:
+- createManual, requestClosure, approveClosure, rejectClosure metodlarına 
+  timeline kayıtları eklenecek
+- Frontend timeline bileşeni oluşturulacak
+- Modal'a timeline sekmesi eklenecek
