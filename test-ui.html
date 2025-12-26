@@ -341,12 +341,60 @@
             }
         }
 
+        // Görselleri upload et
+        async function uploadImages(imagePaths) {
+            try {
+                log(`📤 ${imagePaths.length} görsel yükleniyor...`, 'info');
+
+                const uploadedUrls = [];
+
+                for (const imagePath of imagePaths) {
+                    // Görseli fetch et
+                    const imageResponse = await fetch(imagePath);
+                    const imageBlob = await imageResponse.blob();
+
+                    // FormData oluştur
+                    const formData = new FormData();
+                    const fileName = imagePath.split('/').pop();
+                    formData.append('file', imageBlob, fileName);
+
+                    // Upload et
+                    const uploadResponse = await fetch(`${CONFIG.HSE_API}/api/v1/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const uploadData = await uploadResponse.json();
+                    if (uploadData.success && uploadData.data.url) {
+                        uploadedUrls.push(uploadData.data.url);
+                        log(`✓ Görsel yüklendi: ${fileName}`, 'success');
+                    } else {
+                        throw new Error(`Görsel yüklenemedi: ${fileName}`);
+                    }
+                }
+
+                log(`✓ Tüm görseller yüklendi (${uploadedUrls.length})`, 'success');
+                return uploadedUrls;
+            } catch (error) {
+                log(`✗ Görsel yükleme hatası: ${error.message}`, 'error');
+                return [];
+            }
+        }
+
         // Aksiyon oluştur
         async function createAction(scenario) {
             try {
                 log(`\n📝 Senaryo ${scenario}: Aksiyon oluşturuluyor...`, 'info');
 
                 await login(CONFIG.USERS.creator.email);
+
+                // Görselleri upload et
+                const hazardImages = [
+                    'https://takipus.apps.misafirus.com/test-images/hse_safety_hazard_1_1766709939331.png',
+                    'https://takipus.apps.misafirus.com/test-images/hse_safety_hazard_2_1766709956491.png',
+                    'https://takipus.apps.misafirus.com/test-images/hse_safety_hazard_3_1766709971379.png'
+                ];
+                const uploadedPhotos = await uploadImages(hazardImages);
 
                 const actionData = {
                     company_id: 'F9946',
@@ -358,7 +406,8 @@
                     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                     risk_probability: 3,
                     risk_severity: 3,
-                    source_type: 'manual'
+                    source_type: 'manual',
+                    photos: uploadedPhotos
                 };
 
                 // Senaryo 2 ve 3'te Manager ekle
@@ -396,13 +445,21 @@
 
                 await login(CONFIG.USERS.assignee.email);
 
+                // Kapatma kanıt görsellerini upload et
+                const evidenceImages = [
+                    'https://takipus.apps.misafirus.com/test-images/hse_closure_evidence_1_1766710132371.png',
+                    'https://takipus.apps.misafirus.com/test-images/hse_closure_evidence_2_1766710147193.png',
+                    'https://takipus.apps.misafirus.com/test-images/hse_closure_evidence_3_1766710163303.png'
+                ];
+                const uploadedEvidence = await uploadImages(evidenceImages);
+
                 const response = await fetch(`${CONFIG.HSE_API}/api/v1/actions/${state[scenario].actionId}/closure-request`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         requested_by: CONFIG.USERS.assignee.id,
-                        closure_description: 'Test kapatma açıklaması - Aksiyon tamamlandı',
-                        evidence_files: []
+                        closure_description: 'Test kapatma açıklaması - Aksiyon tamamlandı. Tüm güvenlik riskleri giderildi.',
+                        evidence_files: uploadedEvidence
                     })
                 });
 
