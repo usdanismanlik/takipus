@@ -85,7 +85,7 @@ class PeriodicInspectionController
     public function getUpcoming(): void
     {
         $daysAhead = $_GET['days_ahead'] ?? 7;
-        $inspections = $this->inspectionModel->getUpcoming((int)$daysAhead);
+        $inspections = $this->inspectionModel->getUpcoming((int) $daysAhead);
         Response::success($inspections);
     }
 
@@ -97,6 +97,20 @@ class PeriodicInspectionController
     {
         $inspections = $this->inspectionModel->getOverdue();
         Response::success($inspections);
+    }
+
+    /**
+     * GET /api/v1/periodic-inspections/:id
+     * Belirli bir periyodik kontrolü getir
+     */
+    public function show(int $id): void
+    {
+        $inspection = $this->inspectionModel->find($id);
+        if (!$inspection) {
+            Response::error('Periyodik kontrol bulunamadı', 404);
+            return;
+        }
+        Response::success($inspection);
     }
 
     /**
@@ -144,15 +158,24 @@ class PeriodicInspectionController
         }
 
         $updateData = [];
-        if (isset($data['equipment_name'])) $updateData['equipment_name'] = $data['equipment_name'];
-        if (isset($data['equipment_code'])) $updateData['equipment_code'] = $data['equipment_code'];
-        if (isset($data['inspection_type'])) $updateData['inspection_type'] = $data['inspection_type'];
-        if (isset($data['inspection_frequency'])) $updateData['inspection_frequency'] = $data['inspection_frequency'];
-        if (isset($data['next_inspection_date'])) $updateData['next_inspection_date'] = $data['next_inspection_date'];
-        if (isset($data['responsible_user_id'])) $updateData['responsible_user_id'] = $data['responsible_user_id'];
-        if (isset($data['location'])) $updateData['location'] = $data['location'];
-        if (isset($data['status'])) $updateData['status'] = $data['status'];
-        if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
+        if (isset($data['equipment_name']))
+            $updateData['equipment_name'] = $data['equipment_name'];
+        if (isset($data['equipment_code']))
+            $updateData['equipment_code'] = $data['equipment_code'];
+        if (isset($data['inspection_type']))
+            $updateData['inspection_type'] = $data['inspection_type'];
+        if (isset($data['inspection_frequency']))
+            $updateData['inspection_frequency'] = $data['inspection_frequency'];
+        if (isset($data['next_inspection_date']))
+            $updateData['next_inspection_date'] = $data['next_inspection_date'];
+        if (isset($data['responsible_user_id']))
+            $updateData['responsible_user_id'] = $data['responsible_user_id'];
+        if (isset($data['location']))
+            $updateData['location'] = $data['location'];
+        if (isset($data['status']))
+            $updateData['status'] = $data['status'];
+        if (isset($data['notes']))
+            $updateData['notes'] = $data['notes'];
 
         if (!empty($updateData)) {
             $this->inspectionModel->update($id, $updateData);

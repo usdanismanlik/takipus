@@ -93,6 +93,7 @@ $router->post('/api/v1/periodic-inspections', 'PeriodicInspectionController@stor
 $router->get('/api/v1/periodic-inspections', 'PeriodicInspectionController@index');
 $router->get('/api/v1/periodic-inspections/upcoming', 'PeriodicInspectionController@getUpcoming');
 $router->get('/api/v1/periodic-inspections/overdue', 'PeriodicInspectionController@getOverdue');
+$router->get('/api/v1/periodic-inspections/:id', 'PeriodicInspectionController@show');
 $router->post('/api/v1/periodic-inspections/:id/complete', 'PeriodicInspectionController@complete');
 $router->put('/api/v1/periodic-inspections/:id', 'PeriodicInspectionController@update');
 
