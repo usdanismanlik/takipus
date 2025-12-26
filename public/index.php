@@ -101,6 +101,11 @@ $router->get('/api/v1/periodic-inspections/:id/records', 'InspectionRecordContro
 $router->post('/api/v1/periodic-inspections/:id/records', 'InspectionRecordController@createRecord');
 $router->get('/api/v1/periodic-inspections/:id/records/latest', 'InspectionRecordController@getLatestRecord');
 
+// Cron Webhook Endpoints
+$router->post('/api/v1/cron/check-inspections', 'CronController@checkInspections');
+$router->post('/api/v1/cron/send-reminders', 'CronController@sendReminders');
+$router->get('/api/v1/cron/status', 'CronController@status');
+
 // Export Endpoints
 $router->get('/api/v1/export/actions/excel', 'ExportController@exportActionsExcel');
 $router->get('/api/v1/export/actions/csv', 'ExportController@exportActionsCsv');
