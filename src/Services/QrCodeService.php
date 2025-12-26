@@ -58,7 +58,7 @@ class QrCodeService
             margin: 10,
             roundBlockSizeMode: RoundBlockSizeMode::Margin
         );
-        
+
         $result = $builder->build();
 
         // 2. Create Canvas with Text (Using GD)
@@ -76,26 +76,47 @@ class QrCodeService
         $canvas = imagecreatetruecolor($canvasWidth, $canvasHeight);
         $white = imagecolorallocate($canvas, 255, 255, 255);
         $black = imagecolorallocate($canvas, 0, 0, 0);
-        
+
         // Fill white background
         imagefill($canvas, 0, 0, $white);
 
         // Copy QR code to canvas
         imagecopy($canvas, $qrImage, $padding, $padding, 0, 0, $qrWidth, $qrHeight);
 
-        // Add Text
-        // Note: Using built-in font for simplicity
-        $font = 4; // Built-in font size
-        
-        // Center text 1 (Name)
-        $text1Width = imagefontwidth($font) * strlen($label1);
-        $x1 = ($canvasWidth - $text1Width) / 2;
-        imagestring($canvas, $font, $x1, (int)($qrHeight + $padding + 10), $label1, $black);
+        // Add Text using TTF for UTF-8 Support
+        $fontFile = __DIR__ . '/../../vendor/endroid/qr-code/assets/open_sans.ttf';
 
-        // Center text 2 (Code)
-        $text2Width = imagefontwidth($font) * strlen($code);
-        $x2 = ($canvasWidth - $text2Width) / 2;
-        imagestring($canvas, $font, $x2, (int)($qrHeight + $padding + 35), $code, $black);
+        // Font dosyası kontrolü (Fallback to built-in if missing)
+        if (!file_exists($fontFile)) {
+            $font = 4;
+            $text1Width = imagefontwidth($font) * strlen($label1);
+            $x1 = ($canvasWidth - $text1Width) / 2;
+            imagestring($canvas, $font, (int) $x1, (int) ($qrHeight + $padding + 10), $label1, $black);
+
+            $text2Width = imagefontwidth($font) * strlen($code);
+            $x2 = ($canvasWidth - $text2Width) / 2;
+            imagestring($canvas, $font, (int) $x2, (int) ($qrHeight + $padding + 35), $code, $black);
+        } else {
+            $fontSize = 12;
+
+            // Calculate text box for center alignment
+            // imagettfbbox returns array with 8 elements representing 4 corners
+
+            // Text 1 (Name)
+            $bbox1 = imagettfbbox($fontSize, 0, $fontFile, $label1);
+            $text1Width = abs($bbox1[4] - $bbox1[0]);
+            $x1 = ($canvasWidth - $text1Width) / 2;
+            // Y position is baseline, so add padding + height
+            $y1 = $qrHeight + $padding + 25;
+            imagettftext($canvas, $fontSize, 0, (int) $x1, (int) $y1, $black, $fontFile, $label1);
+
+            // Text 2 (Code)
+            $bbox2 = imagettfbbox($fontSize, 0, $fontFile, $code);
+            $text2Width = abs($bbox2[4] - $bbox2[0]);
+            $x2 = ($canvasWidth - $text2Width) / 2;
+            $y2 = $y1 + 25;
+            imagettftext($canvas, $fontSize, 0, (int) $x2, (int) $y2, $black, $fontFile, $code);
+        }
 
         // 3. Save to temp file
         $tempFile = sys_get_temp_dir() . '/' . uniqid('qr_') . '.jpg';
@@ -103,7 +124,7 @@ class QrCodeService
 
         // 4. Upload to S3
         $s3Key = 'uploads/qrcodes/' . date('Y/m/d') . '/' . uniqid() . '.jpg';
-        
+
         try {
             if ($this->s3Client) {
                 $result = $this->s3Client->putObject([
@@ -113,7 +134,7 @@ class QrCodeService
                     'ACL' => 'public-read',
                     'ContentType' => 'image/jpeg',
                 ]);
-                
+
                 $url = $result['ObjectURL'];
             } else {
                 // Fallback for local dev if S3 not configured? Or throw error.
@@ -125,8 +146,10 @@ class QrCodeService
             if (file_exists($tempFile)) {
                 unlink($tempFile);
             }
-            if ($qrImage) imagedestroy($qrImage);
-            if ($canvas) imagedestroy($canvas);
+            if ($qrImage)
+                imagedestroy($qrImage);
+            if ($canvas)
+                imagedestroy($canvas);
         }
 
         return $url;
