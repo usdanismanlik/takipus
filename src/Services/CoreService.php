@@ -7,7 +7,7 @@ class CoreService
     // WARNING: 'host.docker.internal' works on Docker Desktop (Mac/Windows). 
     // For Linux native docker, you might need --add-host or use network alias if on shared network.
     // 'mobileapp_php' is the container name but they are on different networks, so we use host port mapping.
-    private const CORE_SERVICE_URL = 'http://host.docker.internal:8090/internal/send-notification';
+    private const CORE_SERVICE_URL = 'https://auth-notfy-app.misafirus.com/internal/send-notification';
 
     /**
      * Send a push notification via the Core Service
