@@ -57,4 +57,80 @@ class CoreService
 
         return json_decode($response, true);
     }
+
+    // Base URL for user service
+    private static $baseUrl = 'http://host.docker.internal:8090';
+
+    /**
+     * Kullanıcı meta bilgilerini getir
+     *
+     * @param int $userId
+     * @return array|null
+     */
+    public static function getUserMeta(int $userId): ?array
+    {
+        try {
+            $url = self::$baseUrl . "/users/{$userId}/meta";
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5); // 5 saniye timeout
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json'
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            if ($error) {
+                error_log("getUserMeta Curl Error for user {$userId}: " . $error);
+                return null;
+            }
+
+            if ($httpCode === 200) {
+                $data = json_decode($response, true);
+                if ($data && $data['success'] && isset($data['data'])) {
+                    return $data['data'];
+                }
+            }
+
+            error_log("getUserMeta HTTP Error for user {$userId}: HTTP {$httpCode}");
+            return null;
+        } catch (\Exception $e) {
+            error_log("getUserMeta Exception for user {$userId}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Kullanıcı adını getir (static cache ile)
+     *
+     * @param int $userId
+     * @return string
+     */
+    public static function getUserName(int $userId): string
+    {
+        static $cache = [];
+
+        // Cache'de varsa döndür
+        if (isset($cache[$userId])) {
+            return $cache[$userId];
+        }
+
+        // API'den getir
+        $userMeta = self::getUserMeta($userId);
+
+        if ($userMeta && isset($userMeta['metadata']['name'])) {
+            $name = $userMeta['metadata']['name'];
+            $cache[$userId] = $name;
+            return $name;
+        }
+
+        // Fallback
+        $fallback = "Kullanıcı #{$userId}";
+        $cache[$userId] = $fallback;
+        return $fallback;
+    }
 }

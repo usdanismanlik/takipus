@@ -1274,11 +1274,9 @@ class ActionController
     private function getUserName(?int $userId): string
     {
         if (!$userId) {
-            return 'Bilinmeyen Kullanıcı';
+            return 'Bilinmeyen';
         }
 
-        // TODO: CoreService'den kullanıcı bilgisi çek
-        // Şimdilik user ID kullan
-        return "Kullanıcı #{$userId}";
+        return CoreService::getUserName($userId);
     }
 }
