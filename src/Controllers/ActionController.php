@@ -267,6 +267,21 @@ class ActionController
             $data['created_by']
         );
 
+        // Timeline kaydı ekle
+        $this->timelineModel->addEvent(
+            $actionId,
+            'created',
+            $data['created_by'],
+            'Aksiyon Oluşturuldu',
+            "Yeni aksiyon oluşturuldu: {$data['title']}",
+            [
+                'assigned_to' => $this->getUserName($data['assigned_to_user_id'] ?? null),
+                'due_date' => $data['due_date'] ?? null,
+                'risk_level' => $riskInfo['level'],
+                'photos' => $photos ? json_decode($photos, true) : []
+            ]
+        );
+
         if ($action['due_date_reminder_days']) {
             $action['due_date_reminder_days'] = json_decode($action['due_date_reminder_days'], true);
         }
@@ -678,6 +693,18 @@ class ActionController
         // Aksiyonu oluşturan kişiye bildirim gönder
         $this->sendClosureRequestToCreator($action, $closureId);
 
+        // Timeline kaydı ekle
+        $this->timelineModel->addEvent(
+            $id,
+            'closure_requested',
+            $data['requested_by'],
+            'Kapatma Talebi Gönderildi',
+            $data['closure_description'],
+            [
+                'photos' => $evidenceFiles ? json_decode($evidenceFiles, true) : []
+            ]
+        );
+
         // Audit log
         $closure = $this->closureModel->find($closureId);
         AuditLogger::logCreate(
@@ -796,6 +823,21 @@ class ActionController
             return;
         }
 
+        // Timeline kaydı ekle
+        $isFirstApproval = ($closure['status'] === 'pending');
+        $this->timelineModel->addEvent(
+            $id,
+            'closure_approved',
+            $reviewedBy,
+            $isFirstApproval ? 'İlk Onay Verildi' : 'Kapatma Onaylandı',
+            $data['review_notes'] ?? 'Onaylandı',
+            [
+                'approval_type' => $isFirstApproval ? 'first' : 'final',
+                'previous_status' => $closure['status'],
+                'new_status' => $isFirstApproval ? 'first_approved' : 'approved'
+            ]
+        );
+
         // Audit log
         $updatedClosure = $this->closureModel->find($closureId);
         AuditLogger::logUpdate(
@@ -907,6 +949,19 @@ class ActionController
             Response::error('Bu kapatma talebi zaten işleme alınmış', 422);
             return;
         }
+
+        // Timeline kaydı ekle
+        $this->timelineModel->addEvent(
+            $id,
+            'closure_rejected',
+            $reviewedBy,
+            'Kapatma Talebi Reddedildi',
+            $data['review_notes'] ?? 'Reddedildi',
+            [
+                'previous_status' => $closure['status'],
+                'new_status' => 'rejected'
+            ]
+        );
 
         // Audit log
         $updatedClosure = $this->closureModel->find($closureId);
