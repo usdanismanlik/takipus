@@ -27,35 +27,6 @@ set_exception_handler(function ($e) {
 // CORS
 CorsMiddleware::handle();
 
-// Serve static files (test-ui.html, test-images/*)
-$requestUri = $_SERVER['REQUEST_URI'];
-$parsedPath = parse_url($requestUri, PHP_URL_PATH);
-
-// Debug log
-error_log("REQUEST_URI: " . $requestUri);
-error_log("Parsed Path: " . $parsedPath);
-
-// Static files
-if ($parsedPath === '/test-ui.html') {
-    $filePath = __DIR__ . '/test-ui.html';
-    if (file_exists($filePath)) {
-        header('Content-Type: text/html; charset=utf-8');
-        readfile($filePath);
-        exit;
-    }
-}
-
-// Static directories (test-images)
-if (strpos($parsedPath, '/test-images/') === 0) {
-    $filePath = __DIR__ . $parsedPath;
-    if (file_exists($filePath)) {
-        $mimeType = mime_content_type($filePath);
-        header('Content-Type: ' . $mimeType);
-        readfile($filePath);
-        exit;
-    }
-}
-
 // Router
 $router = new Router();
 
