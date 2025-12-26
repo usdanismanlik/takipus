@@ -59,7 +59,7 @@ class CoreService
     }
 
     // Base URL for user service
-    private static $baseUrl = 'http://host.docker.internal:8090';
+    private static $baseUrl = 'https://auth-notfy-app.misafirus.com';
 
     /**
      * Kullanıcı meta bilgilerini getir
