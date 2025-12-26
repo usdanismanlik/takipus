@@ -115,11 +115,13 @@ class ChecklistController
                     continue;
                 }
 
-                // Skor tipi için min/max kontrol
+                // Skor tipi için min/max kontrol (yoksa default değerler)
                 if ($question['question_type'] === 'score') {
-                    if (!isset($question['min_score']) || !isset($question['max_score'])) {
-                        Response::error('Skor tipi sorular için min_score ve max_score zorunludur', 422);
-                        return;
+                    if (!isset($question['min_score'])) {
+                        $question['min_score'] = 1;
+                    }
+                    if (!isset($question['max_score'])) {
+                        $question['max_score'] = 10;
                     }
                 }
 
@@ -203,11 +205,14 @@ class ChecklistController
                     continue;
                 }
 
-                // Skor tipi için min/max kontrol
+
+                // Skor tipi için min/max kontrol (yoksa default değerler)
                 if ($question['question_type'] === 'score') {
-                    if (!isset($question['min_score']) || !isset($question['max_score'])) {
-                        Response::error('Skor tipi sorular için min_score ve max_score zorunludur', 422);
-                        return;
+                    if (!isset($question['min_score'])) {
+                        $question['min_score'] = 1;
+                    }
+                    if (!isset($question['max_score'])) {
+                        $question['max_score'] = 10;
                     }
                 }
 
