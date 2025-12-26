@@ -7,10 +7,12 @@ use Src\Models\FieldTourResponse;
 use Src\Models\Checklist;
 use Src\Models\ChecklistQuestion;
 use Src\Models\Action;
+use Src\Models\ActionTimeline;
 use Src\Models\Notification;
 use Src\Helpers\Response;
 use Src\Helpers\AuditLogger;
 use Src\Helpers\RiskMatrix;
+use Src\Services\CoreService;
 
 class FieldTourController
 {
@@ -19,6 +21,7 @@ class FieldTourController
     private Checklist $checklistModel;
     private ChecklistQuestion $questionModel;
     private Action $actionModel;
+    private ActionTimeline $timelineModel;
     private Notification $notificationModel;
 
     public function __construct()
@@ -28,6 +31,7 @@ class FieldTourController
         $this->checklistModel = new Checklist();
         $this->questionModel = new ChecklistQuestion();
         $this->actionModel = new Action();
+        $this->timelineModel = new ActionTimeline();
         $this->notificationModel = new Notification();
     }
 
@@ -68,12 +72,12 @@ class FieldTourController
         ]);
 
         $tour = $this->tourModel->find($tourId);
-        
+
         // Checklist sorularını da döndür
         $questions = $this->questionModel->getByChecklist($data['checklist_id']);
         $tour['checklist'] = $checklist;
         $tour['questions'] = $questions;
-        
+
         // Audit log
         AuditLogger::logCreate(
             '/api/v1/field-tours',
@@ -124,7 +128,7 @@ class FieldTourController
         if ($question['question_type'] === 'yes_no' && strtolower($data['answer_value']) === 'no') {
             $isCompliant = 0;
         } elseif (isset($data['is_compliant'])) {
-            $isCompliant = (int)$data['is_compliant'];
+            $isCompliant = (int) $data['is_compliant'];
         }
 
         // Fotoğrafları JSON olarak kaydet
@@ -159,7 +163,7 @@ class FieldTourController
         if ($isCompliant == 0) {
             $this->createActionForNonCompliance($tour, $question, $response, $data);
         }
-        
+
         // Audit log
         AuditLogger::logCreate(
             '/api/v1/field-tours/' . $tourId . '/responses',
@@ -238,6 +242,26 @@ class FieldTourController
             'due_date_reminder_days' => $reminderDays,
             'created_by' => $tour['inspector_user_id'],
         ]);
+
+        // Timeline kaydı oluştur
+        $metadata = [
+            'assigned_to' => CoreService::getUserName($assignedToUserId),
+            'due_date' => $data['due_date'] ?? null,
+            'risk_level' => $riskInfo['level'],
+            'photos' => $photos ? json_decode($photos, true) : null,
+            'source' => 'field_tour',
+            'field_tour_id' => $tour['id'],
+            'response_id' => $response['id']
+        ];
+
+        $this->timelineModel->addEvent(
+            $actionId,
+            'created',
+            $tour['inspector_user_id'],
+            CoreService::getUserName($tour['inspector_user_id']),
+            'Saha turunda uygunsuzluk tespit edildi ve aksiyon oluşturuldu',
+            $metadata
+        );
 
         // Bildirimleri oluştur
         $this->createNotifications($checklist, $question, $actionId, $tour);
@@ -357,12 +381,12 @@ class FieldTourController
         }
 
         $oldValues = $tour;
-        
+
         $this->tourModel->update($id, [
             'status' => 'completed',
             'completed_at' => date('Y-m-d H:i:s'),
         ]);
-        
+
         // Audit log
         $updatedTour = $this->tourModel->getWithResponses($id);
         AuditLogger::logUpdate(
@@ -373,7 +397,7 @@ class FieldTourController
             $updatedTour,
             $tour['inspector_user_id']
         );
-        
+
         Response::success($updatedTour, 'Saha turu tamamlandı');
     }
 }
