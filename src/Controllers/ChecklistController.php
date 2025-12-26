@@ -172,15 +172,6 @@ class ChecklistController
         // FormData veya JSON parse et
         $data = $_POST ?: json_decode(file_get_contents('php://input'), true);
 
-        // Debug
-        error_log("UPDATE CHECKLIST - Data source: " . ($_POST ? 'FormData' : 'JSON'));
-        if (isset($data['questions'])) {
-            error_log("Questions count: " . count($data['questions']));
-            foreach ($data['questions'] as $idx => $q) {
-                error_log("Q[$idx] responsible_user_id: " . ($q['responsible_user_id'] ?? 'not set'));
-            }
-        }
-
         // Checklist var mı kontrol et
         $checklist = $this->checklistModel->find($id);
         if (!$checklist) {
