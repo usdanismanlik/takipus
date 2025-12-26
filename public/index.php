@@ -14,6 +14,9 @@ $dotenv->load();
 error_reporting(E_ALL);
 ini_set('display_errors', $_ENV['APP_DEBUG'] === 'true' ? 1 : 0);
 
+// Timezone - GMT+3 (Turkey)
+date_default_timezone_set('Europe/Istanbul');
+
 set_exception_handler(function ($e) {
     // Always send CORS headers even on error
     header('Access-Control-Allow-Origin: *');
