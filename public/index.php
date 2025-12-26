@@ -102,8 +102,10 @@ $router->post('/api/v1/periodic-inspections/:id/records', 'InspectionRecordContr
 $router->get('/api/v1/periodic-inspections/:id/records/latest', 'InspectionRecordController@getLatestRecord');
 
 // Cron Webhook Endpoints
+$router->post('/api/v1/cron/daily-check', 'CronController@dailyCheck'); // Ana webhook - her sabah 09:00
 $router->post('/api/v1/cron/check-inspections', 'CronController@checkInspections');
 $router->post('/api/v1/cron/send-reminders', 'CronController@sendReminders');
+$router->post('/api/v1/cron/check-action-due-dates', 'CronController@checkActionDueDates');
 $router->get('/api/v1/cron/status', 'CronController@status');
 
 // Export Endpoints
