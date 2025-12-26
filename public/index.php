@@ -96,6 +96,11 @@ $router->get('/api/v1/periodic-inspections/overdue', 'PeriodicInspectionControll
 $router->post('/api/v1/periodic-inspections/:id/complete', 'PeriodicInspectionController@complete');
 $router->put('/api/v1/periodic-inspections/:id', 'PeriodicInspectionController@update');
 
+// Inspection Records Endpoints
+$router->get('/api/v1/periodic-inspections/:id/records', 'InspectionRecordController@getRecords');
+$router->post('/api/v1/periodic-inspections/:id/records', 'InspectionRecordController@createRecord');
+$router->get('/api/v1/periodic-inspections/:id/records/latest', 'InspectionRecordController@getLatestRecord');
+
 // Export Endpoints
 $router->get('/api/v1/export/actions/excel', 'ExportController@exportActionsExcel');
 $router->get('/api/v1/export/actions/csv', 'ExportController@exportActionsCsv');
