@@ -363,6 +363,11 @@ class ActionController
             } else {
                 $action['photos'] = [];
             }
+
+            // Kullanıcı isimlerini ekle
+            $action['assigned_to_user_name'] = $this->getUserName($action['assigned_to_user_id'] ?? null);
+            $action['upper_approver_user_name'] = $this->getUserName($action['upper_approver_id'] ?? null);
+            $action['created_user_name'] = $this->getUserName($action['created_by'] ?? null);
         }
 
         Response::success($actions);
@@ -434,6 +439,11 @@ class ActionController
             $action['approval_notes'] = null;
             $action['rejection_notes'] = null;
         }
+
+        // Kullanıcı isimlerini ekle
+        $action['assigned_to_user_name'] = $this->getUserName($action['assigned_to_user_id'] ?? null);
+        $action['upper_approver_user_name'] = $this->getUserName($action['upper_approver_id'] ?? null);
+        $action['created_user_name'] = $this->getUserName($action['created_by'] ?? null);
 
         Response::success($action);
     }
