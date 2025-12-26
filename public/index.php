@@ -96,6 +96,8 @@ $router->get('/api/v1/periodic-inspections/overdue', 'PeriodicInspectionControll
 $router->get('/api/v1/periodic-inspections/:id', 'PeriodicInspectionController@show');
 $router->post('/api/v1/periodic-inspections/:id/complete', 'PeriodicInspectionController@complete');
 $router->put('/api/v1/periodic-inspections/:id', 'PeriodicInspectionController@update');
+$router->post('/api/v1/periodic-inspections/:id/qr', 'PeriodicInspectionController@generateQrCode');
+$router->post('/api/v1/periodic-inspections/qr', 'PeriodicInspectionController@generateBulkQrCodes');
 
 // Inspection Records Endpoints
 $router->get('/api/v1/periodic-inspections/:id/records', 'InspectionRecordController@getRecords');

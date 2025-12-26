@@ -7,15 +7,19 @@ use Src\Models\Notification;
 use Src\Helpers\Response;
 use Src\Helpers\AuditLogger;
 
+use Src\Services\QrCodeService;
+
 class PeriodicInspectionController
 {
     private PeriodicInspection $inspectionModel;
     private Notification $notificationModel;
+    private QrCodeService $qrCodeService;
 
     public function __construct()
     {
         $this->inspectionModel = new PeriodicInspection();
         $this->notificationModel = new Notification();
+        $this->qrCodeService = new QrCodeService();
     }
 
     /**
@@ -46,6 +50,20 @@ class PeriodicInspectionController
             'notes' => $data['notes'] ?? null,
             'created_by' => $data['created_by'] ?? null,
         ]);
+
+        // QR Kod Oluştur ve Kaydet
+        try {
+            $equipmentCode = $data['equipment_code'] ?? 'N/A';
+            $qrData = "https://app.misafirus.com/inspections/check/{$inspectionId}"; // Örnek URL
+
+            $qrUrl = $this->qrCodeService->generateAndUpload($qrData, $data['equipment_name'], $equipmentCode);
+
+            $this->inspectionModel->update($inspectionId, ['qr_code_url' => $qrUrl]);
+
+        } catch (\Exception $e) {
+            error_log("QR Code Generation Failed: " . $e->getMessage());
+            // QR başarısız olsa bile işlemi başarılı say, sadece logla
+        }
 
         $inspection = $this->inspectionModel->find($inspectionId);
 
@@ -190,7 +208,76 @@ class PeriodicInspectionController
             );
         }
 
-        $updated = $this->inspectionModel->find($id);
         Response::success($updated, 'Periyodik kontrol güncellendi');
+    }
+
+    /**
+     * POST /api/v1/periodic-inspections/:id/qr
+     * Tekil QR kod oluştur
+     */
+    public function generateQrCode(int $id): void
+    {
+        $inspection = $this->inspectionModel->find($id);
+        if (!$inspection) {
+            Response::error('Periyodik kontrol bulunamadı', 404);
+            return;
+        }
+
+        try {
+            $equipmentCode = $inspection['equipment_code'] ?? 'N/A';
+            $qrData = "https://app.misafirus.com/inspections/check/{$id}";
+
+            $qrUrl = $this->qrCodeService->generateAndUpload($qrData, $inspection['equipment_name'], $equipmentCode);
+
+            $this->inspectionModel->update($id, ['qr_code_url' => $qrUrl]);
+            $inspection['qr_code_url'] = $qrUrl;
+
+            Response::success($inspection, 'QR kod başarıyla oluşturuldu');
+        } catch (\Exception $e) {
+            Response::error('QR kod oluşturulamadı: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/v1/periodic-inspections/qr-codes
+     * Toplu QR kod oluştur (Olmayanlar için)
+     */
+    public function generateBulkQrCodes(): void
+    {
+        $companyId = $_GET['company_id'] ?? null;
+        if (!$companyId) {
+            Response::error('company_id parametresi zorunludur', 422);
+            return;
+        }
+
+        $inspections = $this->inspectionModel->getByCompany($companyId);
+        $count = 0;
+        $errors = 0;
+
+        foreach ($inspections as $inspection) {
+            // Eğer QR kodu zaten varsa atla (opsiyonel: ?force=true parametresi eklenebilir)
+            // Kullanıcı "hepsi için oluştursun" dediği için şimdilik boş olanları veya force parametresini kontrol edelim
+            $force = isset($_GET['force']) && $_GET['force'] === 'true';
+
+            if (empty($inspection['qr_code_url']) || $force) {
+                try {
+                    $equipmentCode = $inspection['equipment_code'] ?? 'N/A';
+                    $qrData = "https://app.misafirus.com/inspections/check/{$inspection['id']}";
+
+                    $qrUrl = $this->qrCodeService->generateAndUpload($qrData, $inspection['equipment_name'], $equipmentCode);
+
+                    $this->inspectionModel->update($inspection['id'], ['qr_code_url' => $qrUrl]);
+                    $count++;
+                } catch (\Exception $e) {
+                    error_log("Bulk QR Error ID {$inspection['id']}: " . $e->getMessage());
+                    $errors++;
+                }
+            }
+        }
+
+        Response::success([
+            'generated_count' => $count,
+            'error_count' => $errors
+        ], "Toplu QR oluşturma tamamlandı. {$count} adet oluşturuldu.");
     }
 }

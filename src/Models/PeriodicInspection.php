@@ -19,6 +19,7 @@ class PeriodicInspection extends Model
         'status',
         'notes',
         'created_by',
+        'qr_code_url',
     ];
 
     public function getByCompany(string $companyId, ?string $status = null): array
@@ -45,7 +46,7 @@ class PeriodicInspection extends Model
                 AND next_inspection_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
                 AND next_inspection_date >= CURDATE()
                 ORDER BY next_inspection_date ASC";
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$daysAhead]);
         return $stmt->fetchAll();
@@ -57,7 +58,7 @@ class PeriodicInspection extends Model
                 WHERE status = 'active'
                 AND next_inspection_date < CURDATE()
                 ORDER BY next_inspection_date ASC";
-        
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll();
