@@ -106,13 +106,12 @@ class InspectionScheduler
                     $inspection['responsible_user_id'],
                     'Periyodik Kontrol Gerekli',
                     $inspection['equipment_name'] . ' için kontrol süresi doldu',
-                    'general',
+
                     [
                         'action_id' => $actionId,
                         'inspection_id' => $inspection['id'],
                         'type' => 'periodic_inspection'
-                    ],
-                    'takipus'
+                    ]
                 );
             }
 
