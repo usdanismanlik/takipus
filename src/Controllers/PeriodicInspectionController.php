@@ -87,13 +87,14 @@ class PeriodicInspectionController
     {
         $companyId = $_GET['company_id'] ?? null;
         $status = $_GET['status'] ?? null;
+        $equipmentCode = $_GET['equipment_code'] ?? null;
 
         if (!$companyId) {
             Response::error('company_id parametresi zorunludur', 422);
             return;
         }
 
-        $inspections = $this->inspectionModel->getByCompany($companyId, $status);
+        $inspections = $this->inspectionModel->getByCompany($companyId, $status, $equipmentCode);
         Response::success($inspections);
     }
 

@@ -18,11 +18,12 @@ class PeriodicInspection extends Model
         'location',
         'status',
         'notes',
+        'photos',
         'created_by',
         'qr_code_url',
     ];
 
-    public function getByCompany(string $companyId, ?string $status = null): array
+    public function getByCompany(string $companyId, ?string $status = null, ?string $equipmentCode = null): array
     {
         $sql = "SELECT * FROM {$this->table} WHERE company_id = ?";
         $params = [$companyId];
@@ -30,6 +31,11 @@ class PeriodicInspection extends Model
         if ($status) {
             $sql .= " AND status = ?";
             $params[] = $status;
+        }
+
+        if ($equipmentCode) {
+            $sql .= " AND equipment_code = ?";
+            $params[] = $equipmentCode;
         }
 
         $sql .= " ORDER BY next_inspection_date ASC";

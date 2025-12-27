@@ -11,6 +11,7 @@ class Action extends Model
         'field_tour_id',
         'response_id',
         'checklist_id',
+        'periodic_inspection_id',
         'title',
         'description',
         'photos',

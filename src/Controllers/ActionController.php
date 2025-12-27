@@ -6,6 +6,7 @@ use Src\Models\Action;
 use Src\Models\ActionClosure;
 use Src\Models\ActionTimeline;
 use Src\Models\Notification;
+use Src\Models\InspectionRecord;
 use Src\Helpers\Response;
 use Src\Helpers\AuditLogger;
 use Src\Helpers\RiskMatrix;
@@ -801,6 +802,9 @@ class ActionController
                 // Atanan kullanıcıya bildirim gönder
                 $this->sendClosureCompletedNotification($action);
 
+                // Ekipman bağlantısı varsa kontrol kaydı oluştur
+                $this->createInspectionRecordFromAction($action, $closure);
+
                 $message = 'Kapatma talebi onaylandı ve aksiyon tamamlandı.';
             }
 
@@ -826,6 +830,9 @@ class ActionController
 
             // Atanan kullanıcı ve oluşturana bildirim gönder
             $this->sendClosureCompletedNotification($action);
+
+            // Ekipman bağlantısı varsa kontrol kaydı oluştur
+            $this->createInspectionRecordFromAction($action, $closure);
 
             $message = 'Üst yönetici onayı tamamlandı ve aksiyon kapandı.';
         } else {
@@ -1288,5 +1295,69 @@ class ActionController
         }
 
         return CoreService::getUserName($userId);
+    }
+
+    /**
+     * Aksiyon kapandığında bağlı ekipmanın kontrol kaydını oluştur
+     */
+    private function createInspectionRecordFromAction(array $action, array $closure): void
+    {
+        // Ekipman bağlantısı var mı?
+        if (empty($action['periodic_inspection_id'])) {
+            return;
+        }
+
+        try {
+            $inspectionRecordModel = new InspectionRecord();
+
+            // Ekipman bilgisini al
+            $inspectionModel = new \Src\Models\PeriodicInspection();
+            $equipment = $inspectionModel->find($action['periodic_inspection_id']);
+
+            if (!$equipment) {
+                return;
+            }
+
+            // Bir sonraki kontrol tarihini hesapla
+            $frequency = $equipment['inspection_frequency'];
+            $nextDate = new \DateTime();
+            switch ($frequency) {
+                case 'Haftalık':
+                    $nextDate->modify('+1 week');
+                    break;
+                case 'Aylık':
+                    $nextDate->modify('+1 month');
+                    break;
+                case '3 Aylık':
+                    $nextDate->modify('+3 months');
+                    break;
+                case '6 Aylık':
+                    $nextDate->modify('+6 months');
+                    break;
+                case 'Yıllık':
+                    $nextDate->modify('+1 year');
+                    break;
+                default:
+                    $nextDate->modify('+1 month');
+            }
+
+            // Kontrol kaydını oluştur
+            $recordData = [
+                'company_id' => $action['company_id'],
+                'inspection_id' => $action['periodic_inspection_id'],
+                'inspection_date' => date('Y-m-d'),
+                'inspector_user_id' => $action['assigned_to_user_id'],
+                'status' => 'completed',
+                'findings' => 'Aksiyon #' . $action['id'] . ' ile kapatıldı. ' . ($closure['closure_notes'] ?? ''),
+                'photos' => $closure['evidence_files'] ?? '[]',
+                'next_inspection_date' => $nextDate->format('Y-m-d'),
+            ];
+
+            $inspectionRecordModel->createRecord($recordData);
+
+        } catch (\Exception $e) {
+            // Hata loglansın ama aksiyon kapatmayı engellemesin
+            error_log('InspectionRecord creation failed for action ' . $action['id'] . ': ' . $e->getMessage());
+        }
     }
 }
