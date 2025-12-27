@@ -923,13 +923,6 @@ class ActionController
                     'related_type' => 'action',
                     'related_id' => $action['id'],
                 ]);
-
-                CoreService::sendPushNotification(
-                    (int) $action['upper_approver_id'],
-                    'Kapatma Talebi Reddedildi',
-                    "{$assignedUserName} - {$action['title']}",
-                    ['action_id' => $action['id'], 'type' => 'closure_rejected']
-                );
             }
 
             $message = 'Kapatma talebi reddedildi ve aksiyon tekrar açıldı.';
@@ -1037,14 +1030,6 @@ class ActionController
                 'related_type' => 'action',
                 'related_id' => $action['id'],
             ]);
-
-            // Core Service Trigger
-            CoreService::sendPushNotification(
-                (int) $action['assigned_to_user_id'],
-                'Aksiyon Durumu Değişti',
-                "'{$action['title']}' durumu '{$statusLabels[$newStatus]}' oldu.",
-                ['action_id' => $action['id'], 'type' => 'action_status_changed']
-            );
         }
     }
 
@@ -1078,14 +1063,6 @@ class ActionController
                 'related_type' => 'action',
                 'related_id' => $action['id'],
             ]);
-
-            // Core Service Trigger
-            CoreService::sendPushNotification(
-                (int) $action['created_by'],
-                'Aksiyon Tamamlandı',
-                "'{$action['title']}' aksiyonu tamamlandı.",
-                ['action_id' => $action['id'], 'type' => 'action_completed']
-            );
         }
     }
 
@@ -1138,13 +1115,6 @@ class ActionController
             'related_type' => 'action',
             'related_id' => $action['id'],
         ]);
-
-        CoreService::sendPushNotification(
-            (int) $action['created_by'],
-            'Kapatma Talebi',
-            "'{$action['title']}' için kapatma talebi onayınızı bekliyor",
-            ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_pending']
-        );
     }
 
     /**
@@ -1166,13 +1136,6 @@ class ActionController
             'related_type' => 'action',
             'related_id' => $action['id'],
         ]);
-
-        CoreService::sendPushNotification(
-            $secondApproverId,
-            'İkinci Onay Gerekli',
-            "'{$action['title']}' kapatma talebi onayınızı bekliyor",
-            ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_second_approval']
-        );
     }
 
     /**
@@ -1192,13 +1155,6 @@ class ActionController
             'related_type' => 'action',
             'related_id' => $action['id'],
         ]);
-
-        CoreService::sendPushNotification(
-            $action['upper_approver_id'],
-            'Üst Yönetici Onayı Gerekli',
-            "'{$action['title']}' kapatma talebi onayınızı bekliyor",
-            ['action_id' => $action['id'], 'closure_id' => $closureId, 'type' => 'closure_upper_approval']
-        );
     }
 
     /**
@@ -1215,13 +1171,6 @@ class ActionController
                 'type' => 'action_completed',
                 'data' => json_encode(['action_id' => $action['id']]),
             ]);
-
-            CoreService::sendPushNotification(
-                $action['assigned_to_user_id'],
-                'Aksiyon Kapatıldı',
-                "'{$action['title']}' aksiyonu kapatıldı",
-                ['action_id' => $action['id'], 'type' => 'action_completed']
-            );
         }
 
         // Oluşturana da bildirim (eğer farklıysa)
@@ -1233,13 +1182,6 @@ class ActionController
                 'type' => 'action_completed',
                 'data' => json_encode(['action_id' => $action['id']]),
             ]);
-
-            CoreService::sendPushNotification(
-                $action['created_by'],
-                'Aksiyon Kapatıldı',
-                "'{$action['title']}' aksiyonu kapatıldı",
-                ['action_id' => $action['id'], 'type' => 'action_completed']
-            );
         }
     }
 
@@ -1261,13 +1203,6 @@ class ActionController
             'type' => 'closure_rejected',
             'data' => json_encode(['action_id' => $action['id']]),
         ]);
-
-        CoreService::sendPushNotification(
-            $action['assigned_to_user_id'],
-            'Kapatma Talebi Reddedildi',
-            "{$rejectorTitle} kapatma talebini reddetti",
-            ['action_id' => $action['id'], 'type' => 'closure_rejected']
-        );
     }
 
     /**
