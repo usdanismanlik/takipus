@@ -249,13 +249,6 @@ class ActionController
                 'related_type' => 'action',
                 'related_id' => $actionId,
             ]);
-
-            CoreService::sendPushNotification(
-                (int) $data['upper_approver_id'],
-                'Yeni Aksiyon Oluşturuldu',
-                "Yeni aksiyon: {$data['title']} - Atanan: {$assignedUserName}",
-                ['action_id' => $actionId, 'type' => 'action_created']
-            );
         }
 
         // Audit log
@@ -1068,14 +1061,6 @@ class ActionController
             'related_type' => 'action',
             'related_id' => $action['id'],
         ]);
-
-        // Core Service Trigger
-        CoreService::sendPushNotification(
-            $newUserId,
-            'Yeni Aksiyon Atandı',
-            "Size yeni bir aksiyon atandı: {$action['title']}",
-            ['action_id' => $action['id'], 'type' => 'action_assigned']
-        );
     }
 
     /**

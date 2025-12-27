@@ -2,6 +2,8 @@
 
 namespace Src\Models;
 
+use Src\Services\CoreService;
+
 class Notification extends Model
 {
     protected string $table = 'notifications';
@@ -16,6 +18,37 @@ class Notification extends Model
         'is_read',
         'read_at',
     ];
+
+    /**
+     * Override create method to automatically send push notification
+     */
+    public function create(array $data): int
+    {
+        // Önce DB'ye kaydet
+        $notificationId = parent::create($data);
+
+        // Push notification gönder
+        if (isset($data['user_id']) && isset($data['title']) && isset($data['message'])) {
+            try {
+                CoreService::sendPushNotification(
+                    (int) $data['user_id'],
+                    $data['title'],
+                    $data['message'],
+                    [
+                        'notification_id' => $notificationId,
+                        'type' => $data['type'] ?? 'general',
+                        'related_type' => $data['related_type'] ?? null,
+                        'related_id' => $data['related_id'] ?? null,
+                    ]
+                );
+            } catch (\Exception $e) {
+                // Push hatası DB kaydını engellemez, sadece logla
+                error_log("Push notification failed for user {$data['user_id']}: " . $e->getMessage());
+            }
+        }
+
+        return $notificationId;
+    }
 
     public function getByUser(int $userId, bool $unreadOnly = false): array
     {
