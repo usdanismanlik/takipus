@@ -54,7 +54,8 @@ class PeriodicInspectionController
         // QR Kod Oluştur ve Kaydet
         try {
             $equipmentCode = $data['equipment_code'] ?? 'N/A';
-            $qrData = "https://app.misafirus.com/inspections/check/{$inspectionId}"; // Örnek URL
+            // User requested to put equipment code inside QR
+            $qrData = $equipmentCode;
 
             $qrUrl = $this->qrCodeService->generateAndUpload($qrData, $data['equipment_name'], $equipmentCode);
 
@@ -208,6 +209,8 @@ class PeriodicInspectionController
             );
         }
 
+        // Fetch fresh model to return
+        $updated = $this->inspectionModel->find($id);
         Response::success($updated, 'Periyodik kontrol güncellendi');
     }
 
@@ -225,7 +228,10 @@ class PeriodicInspectionController
 
         try {
             $equipmentCode = $inspection['equipment_code'] ?? 'N/A';
-            $qrData = "https://app.misafirus.com/inspections/check/{$id}";
+            // User requested to put equipment code inside QR
+            // Note: If we put just text, the scanner will read text. 
+            // If the mobile app is custom, it can search by this code.
+            $qrData = $equipmentCode;
 
             $qrUrl = $this->qrCodeService->generateAndUpload($qrData, $inspection['equipment_name'], $equipmentCode);
 
@@ -262,7 +268,8 @@ class PeriodicInspectionController
             if (empty($inspection['qr_code_url']) || $force) {
                 try {
                     $equipmentCode = $inspection['equipment_code'] ?? 'N/A';
-                    $qrData = "https://app.misafirus.com/inspections/check/{$inspection['id']}";
+                    // User requested to put equipment code inside QR
+                    $qrData = $equipmentCode;
 
                     $qrUrl = $this->qrCodeService->generateAndUpload($qrData, $inspection['equipment_name'], $equipmentCode);
 
