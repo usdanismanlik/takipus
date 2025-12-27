@@ -56,6 +56,20 @@ class InspectionScheduler
                 continue;
             }
 
+            // Bu ekipman için açık aksiyon var mı kontrol et
+            $hasOpenAction = $this->actionModel->hasOpenActionForInspection($inspection['id']);
+
+            if ($hasOpenAction) {
+                $results['skipped']++;
+                $results['details'][] = [
+                    'inspection_id' => $inspection['id'],
+                    'equipment_name' => $inspection['equipment_name'],
+                    'status' => 'skipped',
+                    'reason' => 'Bu ekipman için açık aksiyon mevcut'
+                ];
+                continue;
+            }
+
             // Aksiyon oluştur
             $actionId = $this->createActionForInspection($inspection);
 
@@ -89,10 +103,11 @@ class InspectionScheduler
             // Aksiyon oluştur
             $actionId = $this->actionModel->create([
                 'company_id' => $inspection['company_id'],
+                'periodic_inspection_id' => $inspection['id'], // Ekipmanla bağlantı
                 'title' => $title,
                 'description' => $description,
                 'location' => $inspection['location'] ?? 'Belirtilmemiş',
-                'assigned_to' => $inspection['responsible_user_id'] ?? null,
+                'assigned_to_user_id' => $inspection['responsible_user_id'] ?? null,
                 'due_date' => date('Y-m-d', strtotime('+7 days')), // 7 gün içinde yapılmalı
                 'priority' => 'medium',
                 'status' => 'open',

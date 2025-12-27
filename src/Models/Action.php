@@ -101,4 +101,18 @@ class Action extends Model
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([$id]);
     }
+
+    /**
+     * Belirli bir periyodik kontrol için açık aksiyon var mı?
+     */
+    public function hasOpenActionForInspection(int $inspectionId): bool
+    {
+        $sql = "SELECT COUNT(*) FROM {$this->table} 
+                WHERE periodic_inspection_id = ? 
+                AND status NOT IN ('completed', 'cancelled')";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$inspectionId]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
 }
