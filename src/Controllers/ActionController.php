@@ -212,7 +212,7 @@ class ActionController
             'location' => $data['location'] ?? null,
             'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
             'assigned_to_department_id' => $data['assigned_to_department_id'] ?? null,
-            'upper_approver_id' => $data['upper_approver_id'] ?? null, // Üst amir onayı için
+            'upper_approver_id' => !empty($data['upper_approver_id']) ? (int) $data['upper_approver_id'] : null, // Üst amir onayı için
             'status' => 'open',
             'priority' => $riskInfo['priority'],
             'risk_score' => $riskInfo['score'],
