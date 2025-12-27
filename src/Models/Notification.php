@@ -30,16 +30,32 @@ class Notification extends Model
         // Push notification gönder
         if (isset($data['user_id']) && isset($data['title']) && isset($data['message'])) {
             try {
+                // Temel push data
+                $pushData = [
+                    'notification_id' => $notificationId,
+                    'type' => $data['type'] ?? 'general',
+                    'related_type' => $data['related_type'] ?? null,
+                    'related_id' => $data['related_id'] ?? null,
+                ];
+
+                // Eğer action bildirimi ise action_id ekle
+                if ($data['related_type'] === 'action' && isset($data['related_id'])) {
+                    $pushData['action_id'] = $data['related_id'];
+                }
+
+                // Eğer ek data varsa (örn: closure_id) merge et
+                if (isset($data['data'])) {
+                    $extraData = is_string($data['data']) ? json_decode($data['data'], true) : $data['data'];
+                    if (is_array($extraData)) {
+                        $pushData = array_merge($pushData, $extraData);
+                    }
+                }
+
                 CoreService::sendPushNotification(
                     (int) $data['user_id'],
                     $data['title'],
                     $data['message'],
-                    [
-                        'notification_id' => $notificationId,
-                        'type' => $data['type'] ?? 'general',
-                        'related_type' => $data['related_type'] ?? null,
-                        'related_id' => $data['related_id'] ?? null,
-                    ]
+                    $pushData
                 );
             } catch (\Exception $e) {
                 // Push hatası DB kaydını engellemez, sadece logla
